@@ -1,6 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { PlayCircle, CheckCircle, Activity } from 'lucide-react';
+import {useState} from 'react';
+import { PlayCircle, CheckCircle, Activity, ArrowLeft, BarChart2 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Benchmark() {
     const [running, setRunning] = useState(false);
@@ -70,6 +71,18 @@ export default function Benchmark() {
 
     return (
         <div className="h-[calc(100vh-9rem)] flex flex-col p-10 overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black text-white font-sans">
+
+            {/* Navigation */}
+            <div className="flex justify-between items-center mb-6">
+                <Link href="/" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm">
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Demo
+                </Link>
+                <Link href="/compare" className="flex items-center gap-2 text-amber-400/80 hover:text-amber-300 transition-colors text-sm">
+                    <BarChart2 className="w-4 h-4" />
+                    Why QCI?
+                </Link>
+            </div>
 
             {/* Header */}
             <div className="flex justify-between items-end mb-10">

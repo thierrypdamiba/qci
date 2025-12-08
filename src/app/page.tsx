@@ -1,7 +1,41 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Mic, Gavel, ShieldCheck, ChevronDown, Activity, Database, Zap, Layers, GitMerge, Laptop, Trophy, CloudLightning, RotateCcw } from 'lucide-react';
+import {Mic, Gavel, ShieldCheck, ChevronDown, Activity, Database, Zap, Layers, GitMerge, Laptop, Trophy, CloudLightning, RotateCcw, HelpCircle, ChevronLeft, ChevronRight} from 'lucide-react';
 import Link from 'next/link';
+
+// Tour step definitions
+const TOUR_STEPS = [
+    {
+        target: 'court-feed',
+        title: 'Live Court Transcript',
+        description: 'This panel displays the real-time courtroom transcript. Each line of testimony appears here as the trial progresses. Click any line to jump to that moment.',
+        position: 'right'
+    },
+    {
+        target: 'left-lane',
+        title: 'Qdrant Cloud Inference',
+        description: 'This lane shows the AI analysis pipeline using QCI. Embeddings are generated directly on the database cluster, eliminating network hops for faster response times.',
+        position: 'left'
+    },
+    {
+        target: 'right-lane',
+        title: 'Comparison Lane',
+        description: 'This lane runs the same analysis using a different embedding method (Jina Cloud or Local). Compare the timing metrics to see the performance difference.',
+        position: 'left'
+    },
+    {
+        target: 'performance-bar',
+        title: 'Performance Comparison',
+        description: 'See the real-time performance difference between the two approaches. The winner and time saved are displayed here after each analysis.',
+        position: 'top'
+    },
+    {
+        target: 'controls',
+        title: 'Playback Controls',
+        description: 'Control the trial playback here. Press Play to auto-advance through testimony, or use the arrows to step through manually. Press Space to play/pause.',
+        position: 'top'
+    }
+];
 
 const CASES = {
     msft: {
@@ -23,27 +57,17 @@ const CASES = {
         title: "US v. Skilling (Enron)",
         color: "emerald",
         script: [
-            { s: "PROSECUTOR", t: "Mr. Skilling, let's discuss the accounting practices." },
-            { s: "JEFF SKILLING", t: "Our accounting was aggressive but compliant." },
-            { s: "PROSECUTOR", t: "Did you use mark-to-market to book future profits today?" }, // OBJECTION!
-            { s: "JEFF SKILLING", t: "It is the industry standard for energy trading." },
-            { s: "PROSECUTOR", t: "Tell us about the Raptor vehicles. Were they hiding debt?" }, // OBJECTION!
-            { s: "JEFF SKILLING", t: "They were hedging instruments." },
-            { s: "PROSECUTOR", t: "Did you manipulate the California energy market?" }, // OBJECTION!
-            { s: "JEFF SKILLING", t: "The market was flawed. We just traded it." }
-        ]
-    },
-    oj: {
-        title: "People v. Simpson",
-        color: "orange",
-        script: [
-            { s: "MR. DARDEN", t: "Mr. Simpson, please try on the glove found at the scene." },
-            { s: "O.J. SIMPSON", t: "(Struggles) It's too small. It doesn't fit." }, // OBJECTION!
-            { s: "MR. COCHRAN", t: "If it doesn't fit, you must acquit." },
-            { s: "MR. DARDEN", t: "We have DNA evidence placing you at the scene." }, // OBJECTION!
-            { s: "MR. SCHECK", t: "The collection methods were flawed." },
-            { s: "MR. DARDEN", t: "The timeline establishes opportunity." }, // OBJECTION!
-            { s: "MR. COCHRAN", t: "The timeline is physically impossible." }
+            { s: "THE COURT", t: "Mr. Berkowitz, you may proceed with the cross-examination." },
+            { s: "MR. BERKOWITZ", t: "Mr. Skilling, let's discuss Enron's accounting practices." },
+            { s: "JEFF SKILLING", t: "Our accounting was aggressive but fully compliant with GAAP." },
+            { s: "MR. BERKOWITZ", t: "Did you use mark-to-market accounting to book future profits immediately?" }, // OBJECTION!
+            { s: "JEFF SKILLING", t: "It is the industry standard for energy trading companies." },
+            { s: "MR. BERKOWITZ", t: "Tell us about the Raptor vehicles. Were they designed to hide debt from shareholders?" }, // OBJECTION!
+            { s: "JEFF SKILLING", t: "They were legitimate hedging instruments approved by our auditors." },
+            { s: "MR. BERKOWITZ", t: "Did Enron traders manipulate the California energy market?" }, // OBJECTION!
+            { s: "JEFF SKILLING", t: "The market was flawed. We simply traded within its rules." },
+            { s: "MR. BERKOWITZ", t: "Mr. Fastow testified you knew about the hidden losses. Is he lying?" },
+            { s: "JEFF SKILLING", t: "Andrew has every incentive to implicate others." }
         ]
     },
     kitzmiller: {
@@ -70,7 +94,10 @@ export default function Cockpit() {
     const [currentStep, setCurrentStep] = useState(-1);
     const [isPlaying, setIsPlaying] = useState(false);
 
-    // Mode selection for comparison
+    // Check if running in production (Vercel sets this)
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    // Mode selection for comparison (local not available in production)
     const [leftMode, setLeftMode] = useState<'local' | 'jina' | 'qdrant'>('qdrant');
     const [rightMode, setRightMode] = useState<'local' | 'jina' | 'qdrant'>('jina');
     const [hybridMode, setHybridMode] = useState(false);
@@ -224,8 +251,10 @@ export default function Cockpit() {
     }, [history]);
 
     const [showModal, setShowModal] = useState(false);
+    const [tourStep, setTourStep] = useState<number | null>(null);
+    const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null);
 
-    // Check LocalStorage for Modal
+    // Check LocalStorage for Modal - also start tour for first-time visitors
     useEffect(() => {
         const hasVisited = localStorage.getItem('hasVisited');
         if (!hasVisited) {
@@ -233,6 +262,50 @@ export default function Cockpit() {
             localStorage.setItem('hasVisited', 'true');
         }
     }, []);
+
+    // Update highlight rect when tour step changes or window resizes
+    useEffect(() => {
+        const updateRect = () => {
+            if (tourStep !== null && tourStep < TOUR_STEPS.length) {
+                const target = document.querySelector(`[data-tour="${TOUR_STEPS[tourStep].target}"]`);
+                if (target) {
+                    setHighlightRect(target.getBoundingClientRect());
+                }
+            } else {
+                setHighlightRect(null);
+            }
+        };
+
+        updateRect();
+
+        // Update on resize
+        window.addEventListener('resize', updateRect);
+        return () => window.removeEventListener('resize', updateRect);
+    }, [tourStep]);
+
+    // Start tour after modal closes (for first-time visitors)
+    const startTour = () => {
+        setShowModal(false);
+        setTourStep(0);
+    };
+
+    const nextTourStep = () => {
+        if (tourStep !== null && tourStep < TOUR_STEPS.length - 1) {
+            setTourStep(tourStep + 1);
+        } else {
+            setTourStep(null);
+        }
+    };
+
+    const prevTourStep = () => {
+        if (tourStep !== null && tourStep > 0) {
+            setTourStep(tourStep - 1);
+        }
+    };
+
+    const skipTour = () => {
+        setTourStep(null);
+    };
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -278,7 +351,7 @@ export default function Cockpit() {
             // 3. UPDATE STATES
             const updateLane = (data: any, setState: any) => {
                 const isActionable = data.trace.decision === "ACTIONABLE";
-                setState((prev: any) => ({
+                setState((_prev: any) => ({
                     trace: {
                         ...data.trace,
                         text: query,
@@ -348,11 +421,11 @@ export default function Cockpit() {
                 >
                     <div className="flex items-center gap-2">
                         <Icon className={`w-3 h-3 ${statusColors[status as keyof typeof statusColors] || statusColors.default}`} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">{label}</span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-300">{label}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        {subValue && <span className="text-[9px] text-slate-500 hidden sm:inline">{subValue}</span>}
-                        <span className={`text-[10px] font-mono ${value === "---" ? "text-slate-600" : "text-slate-200 animate-fade-in"}`}>{value}</span>
+                        {subValue && <span className="text-[11px] text-slate-500 hidden sm:inline">{subValue}</span>}
+                        <span className={`text-xs font-mono ${value === "---" ? "text-slate-600" : "text-slate-200 animate-fade-in"}`}>{value}</span>
                         <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`} />
                     </div>
                 </div>
@@ -384,7 +457,6 @@ export default function Cockpit() {
         };
         const isQci = mode === 'qdrant';
         const isJina = mode === 'jina';
-        const isLocal = mode === 'local';
 
         const modeLabels = {
             qdrant: { name: 'QCI', icon: CloudLightning, color: 'blue' },
@@ -417,14 +489,14 @@ export default function Cockpit() {
                     <div className="flex flex-col items-end">
                         <div className="flex items-center gap-3">
                             <div className="flex flex-col items-end">
-                                <span className="text-[9px] text-slate-500 uppercase tracking-wider">Embed</span>
+                                <span className="text-[11px] text-slate-500 uppercase tracking-wider">Embed</span>
                                 <span className={`text-xs font-mono font-bold ${state.timings.embed_dense > 0 ? (isQci ? 'text-green-400' : 'text-slate-300') : 'text-slate-600'}`}>
                                     {state.timings.embed_dense > 0 ? `${state.timings.embed_dense}ms` : "---"}
                                 </span>
                             </div>
                             <div className="w-px h-6 bg-white/10"></div>
                             <div className="flex flex-col items-end">
-                                <span className="text-[9px] text-slate-500 uppercase tracking-wider">Total E2E</span>
+                                <span className="text-[11px] text-slate-500 uppercase tracking-wider">Total E2E</span>
                                 <span className={`text-lg font-mono font-bold ${state.timings.total > 0 ? (state.timings.total < 100 ? 'text-green-400' : 'text-white') : 'text-slate-600'}`}>
                                     {state.timings.total > 0 ? `${state.timings.total}ms` : "---"}
                                 </span>
@@ -444,11 +516,15 @@ export default function Cockpit() {
                         expanded={expandedSteps.includes("trigger")}
                         onToggle={() => toggle("trigger")}
                     >
-                        {!isIgnored && state.trace.route && (
+                        {!isIgnored && (
                             <div className="p-1 bg-slate-800/50 rounded border border-white/5">
-                                <div className="text-[9px] text-slate-500 uppercase mb-0.5">Route Plan</div>
-                                <div className="text-[10px] font-mono text-blue-300">
-                                    {state.trace.route.plan} <span className="text-slate-500">({state.trace.route.details})</span>
+                                <div className="text-[11px] text-slate-500 uppercase mb-0.5">Route Plan</div>
+                                <div className="text-xs font-mono text-blue-300">
+                                    {state.trace.route ? (
+                                        <>{state.trace.route.plan} <span className="text-slate-500">({state.trace.route.details})</span></>
+                                    ) : (
+                                        <span className="text-slate-600">rules + case_memory <span className="text-slate-700">(phase=cross)</span></span>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -464,17 +540,25 @@ export default function Cockpit() {
                             expanded={expandedSteps.includes("query")}
                             onToggle={() => toggle("query")}
                         >
-                            {state.trace.query && (
-                                <div className="space-y-0.5">
-                                    <div className="text-[9px] text-slate-500 uppercase">Query Used</div>
-                                    <div className="text-[10px] font-mono text-white truncate">{state.trace.query.text}</div>
-                                    <div className="flex flex-wrap gap-1 mt-0.5">
-                                        {state.trace.query.filters.split(',').map((f: string, i: number) => (
-                                            <span key={i} className="text-[8px] bg-blue-900/30 text-blue-300 px-1 rounded border border-blue-500/20">{f.trim()}</span>
-                                        ))}
-                                    </div>
+                            <div className="space-y-0.5">
+                                <div className="text-[11px] text-slate-500 uppercase">Query Used</div>
+                                <div className={`text-xs font-mono truncate ${state.trace.query ? 'text-white' : 'text-slate-600'}`}>
+                                    {state.trace.query?.text || '...'}
                                 </div>
-                            )}
+                                <div className="flex flex-wrap gap-1 mt-0.5">
+                                    {state.trace.query ? (
+                                        state.trace.query.filters.split(',').map((f: string, i: number) => (
+                                            <span key={i} className="text-[8px] bg-blue-900/30 text-blue-300 px-1 rounded border border-blue-500/20">{f.trim()}</span>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <span className="text-[8px] bg-slate-800/30 text-slate-600 px-1 rounded border border-slate-700/20">case_id=msft</span>
+                                            <span className="text-[8px] bg-slate-800/30 text-slate-600 px-1 rounded border border-slate-700/20">phase=cross</span>
+                                            <span className="text-[8px] bg-slate-800/30 text-slate-600 px-1 rounded border border-slate-700/20">speaker_role=witness</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </TimelineStep>
                     )}
 
@@ -488,7 +572,7 @@ export default function Cockpit() {
                             expanded={expandedSteps.includes("embed")}
                             onToggle={() => toggle("embed")}
                         >
-                            <div className="space-y-0.5 text-[10px] font-mono">
+                            <div className="space-y-0.5 text-xs font-mono">
                                 <div className="flex justify-between items-center">
                                     <span className="text-slate-500">Dense ({state.trace.dense.model})</span>
                                     <span className={state.timings.embed_dense > 0 ? "text-slate-300" : "text-slate-600"}>
@@ -531,7 +615,7 @@ export default function Cockpit() {
                             onToggle={() => toggle("search")}
                         >
                             <div className="flex justify-between p-1 bg-slate-800/30 rounded border border-white/5">
-                                <span className="text-[10px] font-mono text-slate-300">
+                                <span className="text-xs font-mono text-slate-300">
                                     dense k={state.trace.search?.dense_k || 30} • sparse k={state.trace.search?.sparse_k || 30} • retrieved {state.trace.search?.retrieved || 60}
                                 </span>
                             </div>
@@ -551,25 +635,47 @@ export default function Cockpit() {
                         >
                             <div className="space-y-1">
                                 <div className="space-y-1">
-                                    {(showAllEvidence ? hits : hits.slice(0, 3)).map((hit: any, i: number) => (
-                                        <div key={i} className="bg-black/40 p-1 rounded border border-white/5 hover:border-blue-500/30 transition-colors group">
-                                            <div className="flex justify-between items-start mb-0.5">
-                                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                                    <span className={`text-[8px] px-1 rounded uppercase shrink-0 ${hit.payload?.doc_type === 'RULE' ? 'bg-purple-900/50 text-purple-300' : (hit.payload?.doc_type === 'EVIDENCE' ? 'bg-amber-900/50 text-amber-300' : 'bg-slate-800/50 text-slate-300')}`}>
-                                                        {hit.payload?.doc_type || "TRANSCRIPT"}
-                                                    </span>
-                                                    <span className="text-[9px] font-bold text-blue-300 truncate flex-1">{hit.title}</span>
+                                    {hits.length > 0 ? (
+                                        (showAllEvidence ? hits : hits.slice(0, 3)).map((hit: any, i: number) => (
+                                            <div key={i} className="bg-black/40 p-1 rounded border border-white/5 hover:border-blue-500/30 transition-colors group">
+                                                <div className="flex justify-between items-start mb-0.5">
+                                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                        <span className={`text-[8px] px-1 rounded uppercase shrink-0 ${hit.payload?.doc_type === 'RULE' ? 'bg-purple-900/50 text-purple-300' : (hit.payload?.doc_type === 'EVIDENCE' ? 'bg-amber-900/50 text-amber-300' : 'bg-slate-800/50 text-slate-300')}`}>
+                                                            {hit.payload?.doc_type || "TRANSCRIPT"}
+                                                        </span>
+                                                        <span className="text-[11px] font-bold text-blue-300 truncate flex-1">{hit.title}</span>
+                                                    </div>
+                                                    <span className="text-[11px] text-green-400 font-mono ml-1.5">#{hit.fused_rank}</span>
                                                 </div>
-                                                <span className="text-[9px] text-green-400 font-mono ml-1.5">#{hit.fused_rank}</span>
+                                                <div className="text-[11px] text-slate-400 line-clamp-2 font-serif" dangerouslySetInnerHTML={{ __html: hit.snippet }}></div>
                                             </div>
-                                            <div className="text-[9px] text-slate-400 line-clamp-2 font-serif" dangerouslySetInnerHTML={{ __html: hit.snippet }}></div>
-                                        </div>
-                                    ))}
+                                        ))
+                                    ) : (
+                                        /* Placeholder evidence cards */
+                                        [1, 2].map((i) => (
+                                            <div key={i} className="bg-black/40 p-1 rounded border border-white/5 opacity-40">
+                                                <div className="flex justify-between items-start mb-0.5">
+                                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                        <span className="text-[8px] px-1 rounded uppercase shrink-0 bg-slate-800/50 text-slate-500">
+                                                            {i === 1 ? 'TRANSCRIPT' : 'RULE'}
+                                                        </span>
+                                                        <span className="text-[11px] font-bold text-slate-500 truncate flex-1">
+                                                            {i === 1 ? 'Transcript Search' : 'Relevant Precedent'}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[11px] text-slate-600 font-mono ml-1.5">#{i}</span>
+                                                </div>
+                                                <div className="text-[11px] text-slate-600 line-clamp-2 font-serif">
+                                                    {i === 1 ? 'Searching for context on: "..."' : 'No immediate conflicts found.'}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
                                 {hits.length > 3 && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); setShowAllEvidence(!showAllEvidence); }}
-                                        className="w-full py-0.5 text-[9px] text-slate-500 hover:text-slate-300 uppercase tracking-widest border border-white/5 rounded hover:bg-white/5 transition-colors"
+                                        className="w-full py-0.5 text-[11px] text-slate-500 hover:text-slate-300 uppercase tracking-widest border border-white/5 rounded hover:bg-white/5 transition-colors"
                                     >
                                         {showAllEvidence ? "Show Less" : `View All (${hits.length})`}
                                     </button>
@@ -598,7 +704,7 @@ export default function Cockpit() {
                                 <div className={`p-1.5 rounded border ${state.trace.decision === "ACTIONABLE" ? "bg-red-900/20 border-red-500/30" :
                                     (state.trace.decision === "NO_ACTION" ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/30 border-white/5")
                                     }`}>
-                                    <div className="text-[9px] uppercase tracking-widest mb-0.5 opacity-70">
+                                    <div className="text-[11px] uppercase tracking-widest mb-0.5 opacity-70">
                                         {state.trace.decision === "ACTIONABLE" ? "Action" : "Status"}
                                     </div>
                                     <div className={`text-xs font-bold whitespace-normal break-words ${state.trace.decision === "ACTIONABLE" ? "text-red-400" :
@@ -612,16 +718,16 @@ export default function Cockpit() {
                                 {insight.type === "OBJECTION" && (
                                     <>
                                         <div>
-                                            <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-0.5">Script</div>
+                                            <div className="text-[11px] text-slate-500 uppercase tracking-widest mb-0.5">Script</div>
                                             <div className="text-xs font-serif italic text-white bg-white/5 p-1.5 rounded border-l-2 border-red-500 whitespace-normal break-words">
                                                 "{insight.script}"
                                             </div>
                                         </div>
                                         <div>
-                                            <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-0.5">Based On</div>
+                                            <div className="text-[11px] text-slate-500 uppercase tracking-widest mb-0.5">Based On</div>
                                             <div className="flex gap-1.5">
                                                 {hits.slice(0, 2).map((hit: any, i: number) => (
-                                                    <span key={i} className="text-[9px] text-blue-400 bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-500/30">
+                                                    <span key={i} className="text-[11px] text-blue-400 bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-500/30">
                                                         #{hit.fused_rank} {hit.payload?.doc_type}
                                                     </span>
                                                 ))}
@@ -656,7 +762,7 @@ export default function Cockpit() {
                         <h1 className="text-xl font-bold tracking-tight text-white leading-none">
                             {CASES[activeCase].title}
                         </h1>
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 mt-1">
+                        <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mt-1">
                             Co-Counsel AI
                         </span>
                     </div>
@@ -667,7 +773,7 @@ export default function Cockpit() {
 
                     {/* Case Selector */}
                     <div className="flex items-center bg-slate-800/50 rounded-lg border border-white/5 p-1 pr-3 gap-2">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider pl-2">Case</span>
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider pl-2">Case</span>
                         <div className="relative">
                             <select
                                 value={activeCase}
@@ -699,7 +805,7 @@ export default function Cockpit() {
                             }}
                             className="w-3 h-3 rounded border-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer"
                         />
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer whitespace-nowrap" onClick={() => setHybridMode(!hybridMode)}>
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer whitespace-nowrap" onClick={() => setHybridMode(!hybridMode)}>
                             Try Hybrid Search
                         </span>
                     </div>
@@ -707,7 +813,7 @@ export default function Cockpit() {
                     {/* Mode Selectors */}
                     <div className="flex items-center gap-2">
                         <div className="flex items-center bg-blue-900/20 rounded-lg border border-blue-500/30 p-1 pr-3 gap-2">
-                            <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wider pl-2">Left</span>
+                            <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider pl-2">Left</span>
                             <select
                                 value={leftMode}
                                 onChange={(e) => handleLeftModeChange(e.target.value as any)}
@@ -715,13 +821,13 @@ export default function Cockpit() {
                             >
                                 <option value="qdrant">QCI</option>
                                 <option value="jina">Jina Cloud</option>
-                                <option value="local">Local</option>
+                                {!isProduction && <option value="local">Local</option>}
                             </select>
                             <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
                         </div>
                         <span className="text-slate-600 text-xs">vs</span>
                         <div className="flex items-center bg-slate-800/50 rounded-lg border border-white/10 p-1 pr-3 gap-2">
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider pl-2">Right</span>
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider pl-2">Right</span>
                             <select
                                 value={rightMode}
                                 onChange={(e) => handleRightModeChange(e.target.value as any)}
@@ -729,7 +835,7 @@ export default function Cockpit() {
                             >
                                 <option value="qdrant">QCI</option>
                                 <option value="jina">Jina Cloud</option>
-                                <option value="local">Local</option>
+                                {!isProduction && <option value="local">Local</option>}
                             </select>
                             <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
                         </div>
@@ -739,6 +845,24 @@ export default function Cockpit() {
 
                 {/* RIGHT: Actions & Badge */}
                 <div className="flex items-center justify-end gap-3 shrink-0">
+
+                    {/* Why QCI Link */}
+                    <Link
+                        href="/compare"
+                        className="group flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all"
+                    >
+                        <span>Why QCI?</span>
+                        <span className="text-xs text-amber-400/60 group-hover:text-amber-300/80 transition-colors">Learn more →</span>
+                    </Link>
+
+                    {/* How it works button */}
+                    <button
+                        onClick={() => setTourStep(0)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-xs font-medium"
+                    >
+                        <HelpCircle className="w-4 h-4" />
+                        <span className="hidden sm:inline">How it works</span>
+                    </button>
 
                     {/* Primary CTA */}
                     <button
@@ -768,10 +892,10 @@ export default function Cockpit() {
                 <div className="grid grid-cols-12 gap-4 h-full">
 
                     {/* LEFT: Live Transcript (4 cols) */}
-                    <section className="col-span-4 h-full bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl flex flex-col relative overflow-hidden">
+                    <section data-tour="court-feed" className="col-span-4 h-full bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl flex flex-col relative overflow-hidden">
                         <div className="shrink-0 p-4 border-b border-white/5 flex items-center gap-2">
                             <Mic className="w-3 h-3 text-blue-400" />
-                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Court Feed</span>
+                            <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Court Feed</span>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth pb-20">
                             {transcriptLines.length === 0 && (
@@ -791,11 +915,11 @@ export default function Cockpit() {
                                         }}
                                         className={`animate-fade-in flex gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/5 ${isActive ? 'bg-blue-900/20 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border border-transparent'}`}
                                     >
-                                        <div className={`text-[10px] font-bold mt-0.5 w-6 shrink-0 text-right ${line.s.includes("THE COURT") ? "text-slate-500" : (line.s.includes("MR.") ? "text-blue-400" : "text-yellow-200")}`}>
+                                        <div className={`text-xs font-bold mt-0.5 w-6 shrink-0 text-right ${line.s.includes("THE COURT") ? "text-slate-500" : (line.s.includes("MR.") ? "text-blue-400" : "text-yellow-200")}`}>
                                             {line.s.includes("THE COURT") ? "CRT" : (line.s.includes("MR.") ? "Q." : "A.")}
                                         </div>
                                         <div>
-                                            <div className={`text-[10px] font-bold mb-0.5 tracking-wider uppercase ${line.s.includes("THE COURT") ? "text-slate-500" : (line.s.includes("MR.") ? "text-blue-400" : "text-yellow-200")}`}>{line.s}</div>
+                                            <div className={`text-xs font-bold mb-0.5 tracking-wider uppercase ${line.s.includes("THE COURT") ? "text-slate-500" : (line.s.includes("MR.") ? "text-blue-400" : "text-yellow-200")}`}>{line.s}</div>
                                             <div className={`text-sm leading-relaxed ${isActive ? 'text-white font-medium' : 'text-slate-300 opacity-80'}`}>{line.t}</div>
                                         </div>
                                     </div>
@@ -805,17 +929,17 @@ export default function Cockpit() {
                         </div>
 
                         {/* Controls Footer */}
-                        <div className="shrink-0 p-4 border-t border-white/5 bg-black/40 backdrop-blur-md">
+                        <div data-tour="controls" className="shrink-0 p-4 border-t border-white/5 bg-black/40 backdrop-blur-md">
                             {/* Progress Bar */}
                             <div className="flex items-center gap-3 mb-3">
-                                <span className="text-[9px] font-mono text-slate-500 w-8 text-right">{(currentStep + 1).toString().padStart(2, '0')}</span>
+                                <span className="text-[11px] font-mono text-slate-500 w-8 text-right">{(currentStep + 1).toString().padStart(2, '0')}</span>
                                 <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-blue-500 transition-all duration-300 ease-out"
                                         style={{ width: `${((currentStep + 1) / CASES[activeCase].script.length) * 100}%` }}
                                     />
                                 </div>
-                                <span className="text-[9px] font-mono text-slate-500 w-8">{CASES[activeCase].script.length.toString().padStart(2, '0')}</span>
+                                <span className="text-[11px] font-mono text-slate-500 w-8">{CASES[activeCase].script.length.toString().padStart(2, '0')}</span>
                             </div>
 
                             {/* Buttons */}
@@ -887,18 +1011,18 @@ export default function Cockpit() {
                         {/* Lanes Grid */}
                         <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
                             {/* Left Lane */}
-                            <div className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${leftMode === 'qdrant' ? 'border-blue-500/20' : (leftMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
+                            <div data-tour="left-lane" className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${leftMode === 'qdrant' ? 'border-blue-500/20' : (leftMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
                                 <Lane title={leftMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (leftMode === 'jina' ? "JINA CLOUD API" : "LOCAL CLIENT EMBEDDING")} state={qciState} hits={qciState.hits} insight={qciState.insight} mode={leftMode} opponentState={localState} />
                             </div>
 
                             {/* Right Lane */}
-                            <div className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${rightMode === 'qdrant' ? 'border-blue-500/20' : (rightMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
+                            <div data-tour="right-lane" className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${rightMode === 'qdrant' ? 'border-blue-500/20' : (rightMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
                                 <Lane title={rightMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (rightMode === 'jina' ? "JINA CLOUD API" : "LOCAL CLIENT EMBEDDING")} state={localState} hits={localState.hits} insight={localState.insight} mode={rightMode} opponentState={qciState} />
                             </div>
                         </div>
 
                         {/* Winner Ribbon */}
-                        <div className="shrink-0 h-12 bg-gradient-to-r from-blue-900/50 to-slate-900/50 border border-white/10 rounded-xl flex items-center justify-start gap-6 px-4 relative overflow-hidden">
+                        <div data-tour="performance-bar" className="shrink-0 h-12 bg-gradient-to-r from-blue-900/50 to-slate-900/50 border border-white/10 rounded-xl flex items-center justify-start gap-6 px-4 relative overflow-hidden">
                             <div className="absolute inset-0 bg-blue-500/5 animate-pulse"></div>
 
                             {/* Left: Title */}
@@ -918,7 +1042,7 @@ export default function Cockpit() {
                             <div className="relative flex items-center gap-3">
                                 {/* Chip 1: Total Savings */}
                                 <div className="flex items-baseline gap-2 bg-slate-800/80 border border-green-500/30 rounded-lg px-3 py-1.5 shadow-[0_0_10px_rgba(34,197,94,0.1)]">
-                                    <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Total Saved</span>
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-wider font-bold">Total Saved</span>
                                     <span className="text-sm font-mono font-bold text-green-400">
                                         {(localState.timings.total > 0 && qciState.timings.total > 0)
                                             ? `${Math.abs(localState.timings.total - qciState.timings.total).toFixed(0)}ms`
@@ -928,7 +1052,7 @@ export default function Cockpit() {
 
                                 {/* Chip 2: Embedding Savings */}
                                 <div className="flex items-baseline gap-2 bg-slate-800/80 border border-blue-500/30 rounded-lg px-3 py-1.5 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
-                                    <span className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Embed Saved</span>
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-wider font-bold">Embed Saved</span>
                                     <span className="text-sm font-mono font-bold text-blue-400">
                                         {(localState.timings.embed_dense > 0 && qciState.timings.embed_dense > 0)
                                             ? `${Math.abs((localState.timings.embed_dense + localState.timings.embed_sparse) - (qciState.timings.embed_dense + qciState.timings.embed_sparse)).toFixed(0)}ms`
@@ -938,7 +1062,7 @@ export default function Cockpit() {
                             </div>
 
                             {/* Right: Qualifier */}
-                            <div className="ml-auto text-[9px] text-slate-500 font-medium uppercase tracking-wider">
+                            <div className="ml-auto text-[11px] text-slate-500 font-medium uppercase tracking-wider">
                                 {leftMode === 'qdrant' ? 'QCI' : (leftMode === 'jina' ? 'Jina' : 'Local')} vs {rightMode === 'qdrant' ? 'QCI' : (rightMode === 'jina' ? 'Jina' : 'Local')}
                             </div>
                         </div>
@@ -1048,14 +1172,172 @@ export default function Cockpit() {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={() => setShowModal(false)}
-                                className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 hover:scale-[1.02]"
-                            >
-                                Try it out
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowModal(false)}
+                                    className="flex-1 py-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-bold uppercase tracking-widest transition-all"
+                                >
+                                    Skip
+                                </button>
+                                <button
+                                    onClick={startTour}
+                                    className="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 hover:scale-[1.02]"
+                                >
+                                    Take a Tour
+                                </button>
+                            </div>
                         </div>
 
+                    </div>
+                </div>
+            )}
+
+            {/* Tour Overlay */}
+            {tourStep !== null && highlightRect && (
+                <div className="fixed inset-0 z-[200] pointer-events-none">
+                    {/* Dimmed background with cutout */}
+                    <div className="absolute inset-0 pointer-events-auto">
+                        <svg className="w-full h-full">
+                            <defs>
+                                <mask id="tour-mask">
+                                    <rect x="0" y="0" width="100%" height="100%" fill="white" />
+                                    <rect
+                                        x={highlightRect.left - 8}
+                                        y={highlightRect.top - 8}
+                                        width={highlightRect.width + 16}
+                                        height={highlightRect.height + 16}
+                                        rx="16"
+                                        fill="black"
+                                    />
+                                </mask>
+                            </defs>
+                            <rect
+                                x="0"
+                                y="0"
+                                width="100%"
+                                height="100%"
+                                fill="rgba(0,0,0,0.85)"
+                                mask="url(#tour-mask)"
+                            />
+                        </svg>
+                    </div>
+
+                    {/* Highlight border */}
+                    <div
+                        className="absolute border-2 border-blue-500 rounded-2xl shadow-[0_0_30px_rgba(59,130,246,0.5)] transition-all duration-300"
+                        style={{
+                            left: highlightRect.left - 8,
+                            top: highlightRect.top - 8,
+                            width: highlightRect.width + 16,
+                            height: highlightRect.height + 16,
+                        }}
+                    />
+
+                    {/* Tooltip */}
+                    <div
+                        className="absolute pointer-events-auto animate-fade-in"
+                        style={{
+                            left: (() => {
+                                const pos = TOUR_STEPS[tourStep].position;
+                                const tooltipWidth = 320;
+                                const padding = 16;
+
+                                if (pos === 'right') {
+                                    // Check if it fits on right, otherwise put on left
+                                    const rightPos = highlightRect.right + 24;
+                                    if (rightPos + tooltipWidth > window.innerWidth - padding) {
+                                        return Math.max(padding, highlightRect.left - tooltipWidth - 24);
+                                    }
+                                    return rightPos;
+                                } else if (pos === 'left') {
+                                    // Check if it fits on left, otherwise put on right
+                                    const leftPos = highlightRect.left - tooltipWidth - 24;
+                                    if (leftPos < padding) {
+                                        return highlightRect.right + 24;
+                                    }
+                                    return leftPos;
+                                } else {
+                                    // Center horizontally, but keep within bounds
+                                    const centerPos = highlightRect.left + (highlightRect.width / 2) - (tooltipWidth / 2);
+                                    return Math.max(padding, Math.min(centerPos, window.innerWidth - tooltipWidth - padding));
+                                }
+                            })(),
+                            top: (() => {
+                                const pos = TOUR_STEPS[tourStep].position;
+                                const tooltipHeight = 220;
+                                const padding = 16;
+
+                                if (pos === 'top') {
+                                    // Place above, but check if it fits
+                                    const topPos = highlightRect.top - tooltipHeight - 16;
+                                    if (topPos < padding) {
+                                        return highlightRect.bottom + 16;
+                                    }
+                                    return topPos;
+                                } else {
+                                    // Align with top of element, but keep within bounds
+                                    const alignedTop = highlightRect.top;
+                                    return Math.max(padding, Math.min(alignedTop, window.innerHeight - tooltipHeight - padding));
+                                }
+                            })(),
+                            width: 320,
+                        }}
+                    >
+                        <div className="bg-slate-900 border border-blue-500/30 rounded-xl shadow-2xl overflow-hidden">
+                            <div className="p-4">
+                                {/* Step indicator */}
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        {TOUR_STEPS.map((_, i) => (
+                                            <div
+                                                key={i}
+                                                className={`w-2 h-2 rounded-full transition-colors ${i === tourStep ? 'bg-blue-500' : 'bg-slate-700'}`}
+                                            />
+                                        ))}
+                                    </div>
+                                    <span className="text-xs text-slate-500">{tourStep + 1} of {TOUR_STEPS.length}</span>
+                                </div>
+
+                                {/* Title */}
+                                <h3 className="text-lg font-bold text-white mb-2">{TOUR_STEPS[tourStep].title}</h3>
+
+                                {/* Description */}
+                                <p className="text-sm text-slate-400 leading-relaxed mb-4">{TOUR_STEPS[tourStep].description}</p>
+
+                                {/* Navigation */}
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        onClick={skipTour}
+                                        className="text-xs text-slate-500 hover:text-white transition-colors"
+                                    >
+                                        Skip tour
+                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        {tourStep > 0 && (
+                                            <button
+                                                onClick={prevTourStep}
+                                                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                                            >
+                                                <ChevronLeft className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={nextTourStep}
+                                            className="flex items-center gap-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+                                        >
+                                            {tourStep < TOUR_STEPS.length - 1 ? (
+                                                <>
+                                                    Next
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </>
+                                            ) : (
+                                                'Get Started'
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

@@ -1,0 +1,96 @@
+# =============================================================================
+# QCI Demo - Docker Compose
+# =============================================================================
+# Local development environment with Qdrant and FastEmbed
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # Qdrant Vector Database (Local Development)
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qci-qdrant
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # FastEmbed Server (Local Embeddings)
+  # ---------------------------------------------------------------------------
+  fastembed:
+    image: python:3.11-slim
+    container_name: qci-fastembed
+    ports:
+      - "8001:8001"
+    working_dir: /app
+    volumes:
+      - ./scripts:/app/scripts
+      - fastembed_cache:/root/.cache/fastembed
+    command: >
+      bash -c "
+        pip install fastembed flask &&
+        python -c '
+import flask
+from fastembed import TextEmbedding
+import time
+
+app = flask.Flask(__name__)
+model = None
+
+@app.route(\"/health\")
+def health():
+    return {\"status\": \"ok\"}
+
+@app.route(\"/embed\", methods=[\"POST\"])
+def embed():
+    global model
+    if model is None:
+        model = TextEmbedding(\"jinaai/jina-embeddings-v2-base-en\")
+    
+    data = flask.request.json
+    text = data.get(\"text\", \"\")
+    
+    start = time.time()
+    embeddings = list(model.embed([text]))
+    timing_ms = int((time.time() - start) * 1000)
+    
+    return {
+        \"embedding\": embeddings[0].tolist(),
+        \"timingMs\": timing_ms,
+        \"model\": \"jinaai/jina-embeddings-v2-base-en\",
+        \"dimension\": len(embeddings[0])
+    }
+
+if __name__ == \"__main__\":
+    app.run(host=\"0.0.0.0\", port=8001)
+        '
+      "
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  qdrant_storage:
+    driver: local
+  fastembed_cache:
+    driver: local
+
+networks:
+  default:
+    name: qci-network

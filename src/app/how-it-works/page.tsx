@@ -1,5 +1,4 @@
-import React from 'react';
-import { Gavel, CloudLightning, Laptop, ArrowLeft } from 'lucide-react';
+import {Gavel, CloudLightning, Laptop, ArrowLeft} from 'lucide-react';
 import Link from 'next/link';
 
 export default function HowItWorksPage() {

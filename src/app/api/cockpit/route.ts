@@ -241,26 +241,35 @@ function createIgnoredResponse(
  * Analyzes search results for objection recommendations.
  */
 function analyzeResults(results: SearchHit[]): AnalysisResult {
-    // Find the best matching rule with an objection type
-    let bestObjectionRule: SearchHit | null = null;
+    // Find the best matching document with an objection type
+    // Priority: RULE docs first, then any doc with objection_type
+    let bestObjectionHit: SearchHit | null = null;
     let bestObjectionScore = 0;
 
     for (const hit of results) {
         const payload = hit.payload;
 
-        if (
-            payload.doc_type === 'RULE' &&
-            payload.objection_type &&
-            hit.score > bestObjectionScore
+        // Skip documents without objection type
+        if (!payload.objection_type) continue;
+
+        // RULE documents get priority - always use if found
+        if (payload.doc_type === 'RULE' && hit.score > bestObjectionScore) {
+            bestObjectionHit = hit;
+            bestObjectionScore = hit.score;
+        }
+        // For non-RULE docs, only use if we haven't found a RULE doc yet
+        else if (
+            !bestObjectionHit ||
+            (bestObjectionHit.payload.doc_type !== 'RULE' && hit.score > bestObjectionScore)
         ) {
-            bestObjectionRule = hit;
+            bestObjectionHit = hit;
             bestObjectionScore = hit.score;
         }
     }
 
     // Determine if we should recommend an objection
-    if (bestObjectionRule && meetsObjectionThreshold(bestObjectionScore)) {
-        const objectionType = bestObjectionRule.payload.objection_type;
+    if (bestObjectionHit && meetsObjectionThreshold(bestObjectionScore)) {
+        const objectionType = bestObjectionHit.payload.objection_type;
         if (objectionType) {
             const objInfo = getObjectionInfo(objectionType);
 

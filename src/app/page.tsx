@@ -978,7 +978,7 @@ export default function Cockpit() {
                                 </div>
                             )}
                             {transcriptLines.map((line, i) => {
-                                const isActive = i === transcriptLines.length - 1;
+                                const isActive = i === currentStep;
                                 return (
                                     <div
                                         key={i}

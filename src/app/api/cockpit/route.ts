@@ -175,7 +175,7 @@ function initializeTrace(text: string, caseId: string, hybridMode: boolean): Pip
         dense: {model: 'jina-embeddings-v2-base-en', ms: 0, dim: 768},
         sparse: {model: hybridMode ? 'bm25' : '---', ms: 0},
         search: {dense_k: 10, sparse_k: 0, retrieved: 0},
-        fusion: {method: 'RRF', top_k: 5},
+        fusion: {method: hybridMode ? 'RRF' : 'Semantic', top_k: 5},
         latency_e2e: 0,
     };
 }

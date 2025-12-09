@@ -689,7 +689,7 @@ export default function Cockpit() {
                         >
                             <div className="flex justify-between p-1 bg-slate-800/30 rounded border border-white/5">
                                 <span className="text-xs font-mono text-slate-300">
-                                    dense k={state.trace.search?.dense_k || 30} • sparse k={state.trace.search?.sparse_k || 30} • retrieved {state.trace.search?.retrieved || 60}
+                                    dense k={state.trace.search?.dense_k || 10}{state.trace.search?.sparse_k ? ` • sparse k=${state.trace.search.sparse_k}` : ''} • retrieved {state.trace.search?.retrieved || 10}
                                 </span>
                             </div>
                         </TimelineStep>

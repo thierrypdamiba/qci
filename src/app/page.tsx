@@ -578,7 +578,7 @@ export default function Cockpit() {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 scroll-thin pb-16">
+                <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 scroll-thin pb-32">
 
                     {/* 1. Trigger & Gate */}
                     <TimelineStep

@@ -422,38 +422,6 @@ export default function ComparePage() {
               </div>
             </div>
 
-            <div className="p-6 bg-zinc-900/50 rounded-lg border border-amber-500/20">
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-400" />
-                Scale test: Search latency vs collection size
-              </h3>
-              <p className="text-sm text-zinc-500 mb-4">
-                We tested Qdrant Cloud with 35 to 23,000 vectors. Search latency remained nearly constant
-                thanks to HNSW indexing that kicks in automatically at 10k vectors.
-              </p>
-              <div className="grid grid-cols-4 gap-3 text-center">
-                <div className="p-3 bg-zinc-800/50 rounded-lg">
-                  <div className="text-xs text-zinc-500 mb-1">35 docs</div>
-                  <div className="text-xl font-mono text-zinc-300">38<span className="text-xs text-zinc-600">ms</span></div>
-                </div>
-                <div className="p-3 bg-zinc-800/50 rounded-lg">
-                  <div className="text-xs text-zinc-500 mb-1">5,000 docs</div>
-                  <div className="text-xl font-mono text-zinc-300">41<span className="text-xs text-zinc-600">ms</span></div>
-                </div>
-                <div className="p-3 bg-zinc-800/50 rounded-lg">
-                  <div className="text-xs text-zinc-500 mb-1">10,000 docs</div>
-                  <div className="text-xl font-mono text-zinc-300">45<span className="text-xs text-zinc-600">ms</span></div>
-                </div>
-                <div className="p-3 bg-zinc-800/50 rounded-lg border border-amber-500/20">
-                  <div className="text-xs text-amber-400 mb-1">23,000 docs</div>
-                  <div className="text-xl font-mono text-amber-300">39<span className="text-xs text-zinc-600">ms</span></div>
-                </div>
-              </div>
-              <p className="text-xs text-zinc-600 mt-4">
-                HNSW indexing provides O(log n) search complexity. At 23k vectors with 20k indexed,
-                search stays under 50ms. This scales to millions of vectors.
-              </p>
-            </div>
           </section>
         )}
 

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import {Mic, Gavel, ShieldCheck, ChevronDown, Activity, Database, Zap, Layers, GitMerge, Laptop, Trophy, CloudLightning, RotateCcw, HelpCircle, ChevronLeft, ChevronRight} from 'lucide-react';
+import {Mic, Gavel, ShieldCheck, ChevronDown, Activity, Database, Layers, GitMerge, Laptop, Trophy, CloudLightning, RotateCcw, HelpCircle, ChevronLeft, ChevronRight} from 'lucide-react';
 import Link from 'next/link';
 
 // Tour step definitions
@@ -14,7 +14,7 @@ const TOUR_STEPS = [
     {
         target: 'left-lane',
         title: 'Qdrant Cloud Inference',
-        description: 'This lane shows the AI analysis pipeline using QCI. Embeddings are generated directly on the database cluster, eliminating network hops for faster response times.',
+        description: 'This lane shows the AI analysis pipeline using Qdrant Cloud Inference. Embeddings are generated directly on the database cluster, eliminating network hops for faster response times.',
         position: 'left'
     },
     {
@@ -175,6 +175,7 @@ export default function Cockpit() {
     const [rightMode, setRightMode] = useState<'local' | 'jina' | 'qdrant'>('jina');
     const [hybridMode, setHybridMode] = useState(false);
     const [showHybridModal, setShowHybridModal] = useState(false);
+    const [cumulativeTimeSaved, setCumulativeTimeSaved] = useState(0);
 
     // Ensure modes are exclusive
     const handleLeftModeChange = (newMode: 'local' | 'jina' | 'qdrant') => {
@@ -246,9 +247,11 @@ export default function Cockpit() {
     useEffect(() => {
         let timer: NodeJS.Timeout;
         if (isPlaying && currentStep < CASES[activeCase].script.length - 1) {
+            // If we haven't started yet (step -1), advance immediately
+            const delay = currentStep === -1 ? 0 : 4000;
             timer = setTimeout(() => {
                 setCurrentStep(prev => prev + 1);
-            }, 4000);
+            }, delay);
         } else if (currentStep >= CASES[activeCase].script.length - 1) {
             setIsPlaying(false);
         }
@@ -288,6 +291,7 @@ export default function Cockpit() {
         setCurrentStep(-1);
         setTranscriptLines([]);
         setHistory([]);
+        setCumulativeTimeSaved(0);
 
         // Reset both lanes completely
         const resetTrace = {
@@ -452,6 +456,12 @@ export default function Cockpit() {
             updateLane(qciData, setQciState);
             updateLane(localData, setLocalState);
 
+            // Accumulate time saved (positive when left lane is faster)
+            if (qciData.timings?.total > 0 && localData.timings?.total > 0) {
+                const timeSaved = localData.timings.total - qciData.timings.total;
+                setCumulativeTimeSaved(prev => prev + timeSaved);
+            }
+
             // 4. HISTORY (Unified - based on QCI for now)
             if (qciData.trace.decision === "ACTIONABLE") {
                 setHistory(prev => [...prev, {
@@ -512,8 +522,8 @@ export default function Cockpit() {
     };
 
     // Lane Component
-    const Lane = ({ title, state, hits, insight, mode, opponentState }: any) => {
-        const [expandedSteps, setExpandedSteps] = useState<string[]>(['trigger', 'query', 'embed', 'search', 'fusion', 'decision']);
+    const Lane = ({ title, state, hits, insight, mode, opponentState, hybridMode }: any) => {
+        const [expandedSteps, setExpandedSteps] = useState<string[]>(['embed', 'search', 'fusion', 'decision']);
         const [showAllEvidence, setShowAllEvidence] = useState(false);
 
         // Auto-expand Decision on Objection
@@ -532,7 +542,7 @@ export default function Cockpit() {
         const isJina = mode === 'jina';
 
         const modeLabels = {
-            qdrant: { name: 'QCI', icon: CloudLightning, color: 'blue' },
+            qdrant: { name: 'Qdrant Cloud Inference', icon: CloudLightning, color: 'blue' },
             jina: { name: 'Jina Cloud', icon: CloudLightning, color: 'purple' },
             local: { name: 'Local', icon: Laptop, color: 'slate' }
         };
@@ -542,8 +552,13 @@ export default function Cockpit() {
         const trigger = state.trace.trigger || { label: "Processing...", action: "PROCEED" };
         const isIgnored = trigger.action === "IGNORE";
 
+        // Decision state logic - more robust than just checking exact string match
+        const isActionable = state.trace.decision === "ACTIONABLE";
+        const hasCompletedSearch = state.timings.total > 0;
+        const isClean = hasCompletedSearch && !isActionable;
+
         return (
-            <div className={`flex flex-col h-full gap-2 overflow-hidden ${isIgnored ? 'opacity-50 grayscale' : ''} transition-all duration-500`}>
+            <div className={`flex flex-col h-full gap-2 ${isIgnored ? 'opacity-50 grayscale' : ''} transition-all duration-500`}>
                 {/* Sticky Header */}
                 <div className={`shrink-0 px-2 py-1 rounded-xl border flex justify-between items-center ${
                     isQci ? 'bg-blue-900/20 border-blue-500/30' :
@@ -578,7 +593,7 @@ export default function Cockpit() {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 scroll-thin pb-32">
+                <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 scroll-thin" style={{minHeight: 0}}>
 
                     {/* 1. Trigger & Gate */}
                     <TimelineStep
@@ -586,61 +601,16 @@ export default function Cockpit() {
                         label="Trigger"
                         value={trigger.label}
                         status={isIgnored ? "default" : "ok"}
-                        expanded={expandedSteps.includes("trigger")}
-                        onToggle={() => toggle("trigger")}
-                    >
-                        {!isIgnored && (
-                            <div className="p-1 bg-slate-800/50 rounded border border-white/5">
-                                <div className="text-[11px] text-slate-500 uppercase mb-0.5">Route Plan</div>
-                                <div className="text-xs font-mono text-blue-300">
-                                    {state.trace.route ? (
-                                        <>{state.trace.route.plan} <span className="text-slate-500">({state.trace.route.details})</span></>
-                                    ) : (
-                                        <span className="text-slate-600">rules + case_memory <span className="text-slate-700">(phase=cross)</span></span>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </TimelineStep>
+                        expanded={false}
+                        onToggle={() => {}}
+                    />
 
-                    {/* 2. Query Built */}
-                    {!isIgnored && (
-                        <TimelineStep
-                            icon={Zap}
-                            label="Query Built"
-                            value={state.timings.preprocess > 0 ? `${state.timings.preprocess}ms` : "---"}
-                            status="default"
-                            expanded={expandedSteps.includes("query")}
-                            onToggle={() => toggle("query")}
-                        >
-                            <div className="space-y-0.5">
-                                <div className="text-[11px] text-slate-500 uppercase">Query Used</div>
-                                <div className={`text-xs font-mono truncate ${state.trace.query ? 'text-white' : 'text-slate-600'}`}>
-                                    {state.trace.query?.text || '...'}
-                                </div>
-                                <div className="flex flex-wrap gap-1 mt-0.5">
-                                    {state.trace.query ? (
-                                        state.trace.query.filters.split(',').map((f: string, i: number) => (
-                                            <span key={i} className="text-[8px] bg-blue-900/30 text-blue-300 px-1 rounded border border-blue-500/20">{f.trim()}</span>
-                                        ))
-                                    ) : (
-                                        <>
-                                            <span className="text-[8px] bg-slate-800/30 text-slate-600 px-1 rounded border border-slate-700/20">case_id=msft</span>
-                                            <span className="text-[8px] bg-slate-800/30 text-slate-600 px-1 rounded border border-slate-700/20">phase=cross</span>
-                                            <span className="text-[8px] bg-slate-800/30 text-slate-600 px-1 rounded border border-slate-700/20">speaker_role=witness</span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </TimelineStep>
-                    )}
-
-                    {/* 3. Embed */}
+                    {/* 2. Embed */}
                     {!isIgnored && (
                         <TimelineStep
                             icon={modeInfo.icon}
-                            label={isQci ? "Embed (In-Cluster)" : (isJina ? "Embed (Jina API)" : "Embed (Client)")}
-                            value={state.timings.embed_dense > 0 ? `${state.timings.embed_dense + state.timings.embed_sparse}ms` : "---"}
+                            label={hybridMode ? (isQci ? "Embed Dense + Sparse (In-Cluster)" : (isJina ? "Embed Dense + Sparse (Jina API)" : "Embed Dense + Sparse (Client)")) : (isQci ? "Embed (In-Cluster)" : (isJina ? "Embed (Jina API)" : "Embed (Client)"))}
+                            value={state.timings.embed_dense > 0 ? `${state.timings.embed_dense + (state.timings.embed_sparse || 0)}ms` : "---"}
                             status={isQci ? "fast" : (isJina ? "ok" : "slow")}
                             expanded={expandedSteps.includes("embed")}
                             onToggle={() => toggle("embed")}
@@ -652,23 +622,25 @@ export default function Cockpit() {
                                         {state.timings.embed_dense > 0 ? `${state.timings.embed_dense}ms` : "---"}
                                     </span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-slate-500">Sparse ({state.trace.sparse.model})</span>
-                                    <span className={state.timings.embed_sparse > 0 ? "text-slate-300" : "text-slate-600"}>
-                                        {state.timings.embed_sparse > 0 ? `${state.timings.embed_sparse}ms` : "---"}
-                                    </span>
-                                </div>
+                                {hybridMode && (
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-slate-500">Sparse (BM25)</span>
+                                        <span className={state.timings.embed_sparse > 0 ? "text-slate-300" : "text-slate-600"}>
+                                            {state.timings.embed_sparse > 0 ? `${state.timings.embed_sparse}ms` : "---"}
+                                        </span>
+                                    </div>
+                                )}
                                 {opponentState && state.timings.embed_dense > 0 && opponentState.timings.embed_dense > 0 && (
                                     <div className={`mt-0.5 pt-0.5 border-t border-white/5 flex justify-between ${
-                                        (state.timings.embed_dense + state.timings.embed_sparse) < (opponentState.timings.embed_dense + opponentState.timings.embed_sparse)
+                                        state.timings.embed_dense < opponentState.timings.embed_dense
                                         ? 'text-green-400'
                                         : 'text-red-400'
                                     }`}>
                                         <span>ΔEmbed</span>
                                         <span>
-                                            {(state.timings.embed_dense + state.timings.embed_sparse) < (opponentState.timings.embed_dense + opponentState.timings.embed_sparse)
-                                                ? `-${Math.abs((state.timings.embed_dense + state.timings.embed_sparse) - (opponentState.timings.embed_dense + opponentState.timings.embed_sparse))}ms`
-                                                : `+${Math.abs((state.timings.embed_dense + state.timings.embed_sparse) - (opponentState.timings.embed_dense + opponentState.timings.embed_sparse))}ms`
+                                            {state.timings.embed_dense < opponentState.timings.embed_dense
+                                                ? `-${opponentState.timings.embed_dense - state.timings.embed_dense}ms`
+                                                : `+${state.timings.embed_dense - opponentState.timings.embed_dense}ms`
                                             }
                                         </span>
                                     </div>
@@ -677,29 +649,40 @@ export default function Cockpit() {
                         </TimelineStep>
                     )}
 
-                    {/* 4. Search */}
+                    {/* 3. Search */}
                     {!isIgnored && (
                         <TimelineStep
                             icon={Database}
-                            label="Search (Qdrant)"
+                            label={hybridMode ? "Hybrid Search (Qdrant)" : "Search (Qdrant)"}
                             value={state.timings.search > 0 ? `${state.timings.search}ms` : "---"}
                             status="default"
                             expanded={expandedSteps.includes("search")}
                             onToggle={() => toggle("search")}
                         >
-                            <div className="flex justify-between p-1 bg-slate-800/30 rounded border border-white/5">
-                                <span className="text-xs font-mono text-slate-300">
-                                    dense k={state.trace.search?.dense_k || 10}{state.trace.search?.sparse_k ? ` • sparse k=${state.trace.search.sparse_k}` : ''} • retrieved {state.trace.search?.retrieved || 10}
-                                </span>
+                            <div className="space-y-1 text-xs font-mono">
+                                <div className="flex justify-between items-center p-1 bg-slate-800/30 rounded border border-white/5">
+                                    <span className="text-slate-500">Dense k</span>
+                                    <span className="text-slate-300">{state.trace.search?.dense_k || 10}</span>
+                                </div>
+                                {hybridMode && (
+                                    <div className="flex justify-between items-center p-1 bg-slate-800/30 rounded border border-white/5">
+                                        <span className="text-slate-500">Sparse k</span>
+                                        <span className="text-slate-300">{state.trace.search?.sparse_k || 10}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-center p-1 bg-slate-800/30 rounded border border-white/5">
+                                    <span className="text-slate-500">Retrieved</span>
+                                    <span className="text-slate-300">{state.trace.search?.retrieved || 10}</span>
+                                </div>
                             </div>
                         </TimelineStep>
                     )}
 
-                    {/* 5. Fusion (Evidence) */}
+                    {/* 4. Results */}
                     {!isIgnored && (
                         <TimelineStep
                             icon={GitMerge}
-                            label={`Results (${state.trace.fusion.method || 'Semantic'})`}
+                            label={`Results (${hybridMode ? 'RRF Fusion' : (state.trace.fusion.method || 'Semantic')})`}
                             value={state.timings.fusion > 0 ? `${state.timings.fusion}ms` : "---"}
                             status="default"
                             subValue={`Top ${state.trace.fusion.top_k}`}
@@ -757,38 +740,38 @@ export default function Cockpit() {
                         </TimelineStep>
                     )}
 
-                    {/* 6. Decision */}
+                    {/* 5. Decision */}
                     {!isIgnored && (
                         <TimelineStep
                             icon={ShieldCheck}
                             label="Decision"
                             value={
-                                state.trace.decision === "ACTIONABLE" ? `${insight.score}%` :
-                                    (state.trace.decision === "NO_ACTION" ? "Clean" : "---")
+                                isActionable ? `${insight.score}%` :
+                                    (isClean ? "Clean" : "---")
                             }
                             status={
-                                state.trace.decision === "ACTIONABLE" ? "alert" :
-                                    (state.trace.decision === "NO_ACTION" ? "ok" : "default")
+                                isActionable ? "alert" :
+                                    (isClean ? "ok" : "default")
                             }
                             expanded={expandedSteps.includes("decision")}
                             onToggle={() => toggle("decision")}
                         >
                             <div className="space-y-1.5">
-                                <div className={`p-1.5 rounded border ${state.trace.decision === "ACTIONABLE" ? "bg-red-900/20 border-red-500/30" :
-                                    (state.trace.decision === "NO_ACTION" ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/30 border-white/5")
+                                <div className={`p-1.5 rounded border ${isActionable ? "bg-red-900/20 border-red-500/30" :
+                                    (isClean ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/30 border-white/5")
                                     }`}>
                                     <div className="text-[11px] uppercase tracking-widest mb-0.5 opacity-70">
-                                        {state.trace.decision === "ACTIONABLE" ? "Action" : "Status"}
+                                        {isActionable ? "Action" : "Status"}
                                     </div>
-                                    <div className={`text-xs font-bold whitespace-normal break-words ${state.trace.decision === "ACTIONABLE" ? "text-red-400" :
-                                        (state.trace.decision === "NO_ACTION" ? "text-emerald-400" : "text-slate-500")
+                                    <div className={`text-xs font-bold whitespace-normal break-words ${isActionable ? "text-red-400" :
+                                        (isClean ? "text-emerald-400" : "text-slate-500")
                                         }`}>
-                                        {state.trace.decision === "ACTIONABLE" ? insight.recommendation :
-                                            (state.trace.decision === "NO_ACTION" ? "No objection detected." : "---")}
+                                        {isActionable ? insight.recommendation :
+                                            (isClean ? "No objection detected." : "---")}
                                     </div>
                                 </div>
 
-                                {insight.type === "OBJECTION" && (
+                                {isActionable && (
                                     <>
                                         <div>
                                             <div className="text-[11px] text-slate-500 uppercase tracking-widest mb-0.5">Script</div>
@@ -892,7 +875,7 @@ export default function Cockpit() {
                                 onChange={(e) => handleLeftModeChange(e.target.value as any)}
                                 className="appearance-none bg-transparent text-xs font-bold text-blue-300 hover:text-white transition-colors cursor-pointer focus:outline-none pr-4 py-1"
                             >
-                                <option value="qdrant">QCI</option>
+                                <option value="qdrant">Qdrant Cloud Inference</option>
                                 <option value="jina">Jina Cloud</option>
                                 {!isProduction && <option value="local">Local</option>}
                             </select>
@@ -906,7 +889,7 @@ export default function Cockpit() {
                                 onChange={(e) => handleRightModeChange(e.target.value as any)}
                                 className="appearance-none bg-transparent text-xs font-bold text-slate-300 hover:text-white transition-colors cursor-pointer focus:outline-none pr-4 py-1"
                             >
-                                <option value="qdrant">QCI</option>
+                                <option value="qdrant">Qdrant Cloud Inference</option>
                                 <option value="jina">Jina Cloud</option>
                                 {!isProduction && <option value="local">Local</option>}
                             </select>
@@ -919,12 +902,12 @@ export default function Cockpit() {
                 {/* RIGHT: Actions & Badge */}
                 <div className="flex items-center justify-end gap-3 shrink-0">
 
-                    {/* Why QCI Link */}
+                    {/* Why Qdrant Cloud Inference Link */}
                     <Link
                         href="/compare"
                         className="group flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition-all"
                     >
-                        <span>Why QCI?</span>
+                        <span>Why Qdrant Cloud Inference?</span>
                         <span className="text-xs text-amber-400/60 group-hover:text-amber-300/80 transition-colors">Learn more →</span>
                     </Link>
 
@@ -983,7 +966,12 @@ export default function Cockpit() {
                                     <div
                                         key={i}
                                         onClick={() => {
-                                            setCurrentStep(i);
+                                            // If clicking the same step, just re-analyze
+                                            if (i === currentStep) {
+                                                performSearch(line.t);
+                                            } else {
+                                                setCurrentStep(i);
+                                            }
                                             setIsPlaying(false);
                                         }}
                                         className={`animate-fade-in flex gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-white/5 ${isActive ? 'bg-blue-900/20 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]' : 'border border-transparent'}`}
@@ -1085,12 +1073,12 @@ export default function Cockpit() {
                         <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
                             {/* Left Lane */}
                             <div data-tour="left-lane" className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${leftMode === 'qdrant' ? 'border-blue-500/20' : (leftMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
-                                <Lane title={leftMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (leftMode === 'jina' ? "JINA CLOUD API" : "LOCAL CLIENT EMBEDDING")} state={qciState} hits={qciState.hits} insight={qciState.insight} mode={leftMode} opponentState={localState} />
+                                <Lane title={leftMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (leftMode === 'jina' ? "JINA CLOUD API" : "LOCAL CLIENT EMBEDDING")} state={qciState} hits={qciState.hits} insight={qciState.insight} mode={leftMode} opponentState={localState} hybridMode={hybridMode} />
                             </div>
 
                             {/* Right Lane */}
                             <div data-tour="right-lane" className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${rightMode === 'qdrant' ? 'border-blue-500/20' : (rightMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
-                                <Lane title={rightMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (rightMode === 'jina' ? "JINA CLOUD API" : "LOCAL CLIENT EMBEDDING")} state={localState} hits={localState.hits} insight={localState.insight} mode={rightMode} opponentState={qciState} />
+                                <Lane title={rightMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (rightMode === 'jina' ? "JINA CLOUD API" : "LOCAL CLIENT EMBEDDING")} state={localState} hits={localState.hits} insight={localState.insight} mode={rightMode} opponentState={qciState} hybridMode={hybridMode} />
                             </div>
                         </div>
 
@@ -1104,8 +1092,8 @@ export default function Cockpit() {
                                 <span className="text-xs font-bold text-white uppercase tracking-widest truncate max-w-[320px]">
                                     {qciState.timings.total > 0 && localState.timings.total > 0
                                         ? (qciState.timings.total < localState.timings.total
-                                            ? `${leftMode === 'qdrant' ? 'QCI' : (leftMode === 'jina' ? 'Jina' : 'Local')} Wins`
-                                            : `${rightMode === 'qdrant' ? 'QCI' : (rightMode === 'jina' ? 'Jina' : 'Local')} Wins`)
+                                            ? `${leftMode === 'qdrant' ? 'Qdrant Cloud Inference' : (leftMode === 'jina' ? 'Jina' : 'Local')} Wins`
+                                            : `${rightMode === 'qdrant' ? 'Qdrant Cloud Inference' : (rightMode === 'jina' ? 'Jina' : 'Local')} Wins`)
                                         : 'Performance Comparison'
                                     }
                                 </span>
@@ -1132,11 +1120,21 @@ export default function Cockpit() {
                                             : "---"}
                                     </span>
                                 </div>
+
+                                {/* Chip 3: Cumulative Total Savings */}
+                                <div className="flex items-baseline gap-2 bg-slate-800/80 border border-amber-500/30 rounded-lg px-3 py-1.5 shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                                    <span className="text-[11px] text-slate-400 uppercase tracking-wider font-bold">Session Total</span>
+                                    <span className={`text-sm font-mono font-bold ${cumulativeTimeSaved >= 0 ? 'text-amber-400' : 'text-red-400'}`}>
+                                        {cumulativeTimeSaved !== 0
+                                            ? `${cumulativeTimeSaved >= 0 ? '+' : ''}${cumulativeTimeSaved.toFixed(0)}ms`
+                                            : "---"}
+                                    </span>
+                                </div>
                             </div>
 
                             {/* Right: Qualifier */}
                             <div className="ml-auto text-[11px] text-slate-500 font-medium uppercase tracking-wider">
-                                {leftMode === 'qdrant' ? 'QCI' : (leftMode === 'jina' ? 'Jina' : 'Local')} vs {rightMode === 'qdrant' ? 'QCI' : (rightMode === 'jina' ? 'Jina' : 'Local')}
+                                {leftMode === 'qdrant' ? 'Qdrant Cloud Inference' : (leftMode === 'jina' ? 'Jina' : 'Local')} vs {rightMode === 'qdrant' ? 'Qdrant Cloud Inference' : (rightMode === 'jina' ? 'Jina' : 'Local')}
                             </div>
                         </div>
 

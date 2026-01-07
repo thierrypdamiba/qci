@@ -80,13 +80,21 @@ export async function POST(req: Request): Promise<NextResponse<BenchmarkResponse
             // Real QCI: Single API call, embedding happens server-side
             const result = await searchWithQCI(text, BENCHMARK_COLLECTION, 3);
             latency = result.timing_ms;
-            resultText = result.results[0]?.payload?.text?.slice(0, 100) || 'No results';
+            // Handle both 'text' and 'content' payload fields
+            const payload = result.results[0]?.payload;
+            resultText = (payload as {text?: string})?.text?.slice(0, 100)
+                || (payload as {content?: string})?.content?.slice(0, 100)
+                || 'No results';
 
         } else if (modeParam === 'api' || modeParam === 'jina') {
             // Real Jina: Embed via Jina API, then search Qdrant
             const result = await searchWithJinaEmbed(text, BENCHMARK_COLLECTION, 3);
             latency = result.timing_ms;
-            resultText = result.results[0]?.payload?.text?.slice(0, 100) || 'No results';
+            // Handle both 'text' and 'content' payload fields
+            const payload = result.results[0]?.payload;
+            resultText = (payload as {text?: string})?.text?.slice(0, 100)
+                || (payload as {content?: string})?.content?.slice(0, 100)
+                || 'No results';
 
         } else if (modeParam === 'local') {
             // Local: Embed locally, then search Qdrant
@@ -101,7 +109,8 @@ export async function POST(req: Request): Promise<NextResponse<BenchmarkResponse
                     with_payload: true,
                 });
                 latency = Math.round(performance.now() - startTime);
-                resultText = (searchResult[0]?.payload as {text?: string})?.text?.slice(0, 100) || 'No results';
+                const localPayload = searchResult[0]?.payload as {text?: string; content?: string} | undefined;
+                resultText = localPayload?.text?.slice(0, 100) || localPayload?.content?.slice(0, 100) || 'No results';
             } else {
                 // Fallback: simulate local latency
                 simulated = true;

@@ -127,6 +127,102 @@ export async function embedWithJinaApi(
 }
 
 /**
+ * Benchmark result for end-to-end search.
+ */
+export interface BenchmarkSearchResult {
+    results: SearchHit[];
+    timing_ms: number;
+    mode: 'jina' | 'qdrant';
+}
+
+/**
+ * Runs end-to-end search using Jina API for embedding + Qdrant for search.
+ * Measures total time for both operations.
+ *
+ * @param text - Query text
+ * @param collection - Collection to search (defaults to COLLECTION_NAME)
+ * @param limit - Max results
+ * @returns Search results with total timing
+ */
+export async function searchWithJinaEmbed(
+    text: string,
+    collection: string = COLLECTION_NAME,
+    limit: number = 5,
+): Promise<BenchmarkSearchResult> {
+    const qdrantClient = getQdrantClient();
+    const startTime = performance.now();
+
+    // Step 1: Get embedding from Jina API
+    const embedResult = await embedWithJinaApi(text);
+
+    // Step 2: Search Qdrant with the vector
+    const searchResult = await qdrantClient.search(collection, {
+        vector: embedResult.embedding,
+        limit,
+        with_payload: true,
+    });
+
+    const endTime = performance.now();
+
+    const results: SearchHit[] = searchResult.map((hit) => ({
+        id: hit.id,
+        score: hit.score,
+        payload: hit.payload as unknown as DocumentPayload,
+    }));
+
+    return {
+        results,
+        timing_ms: Math.round(endTime - startTime),
+        mode: 'jina',
+    };
+}
+
+/**
+ * Runs end-to-end search using Qdrant Cloud Inference.
+ * Embedding happens server-side, single API call.
+ *
+ * @param text - Query text
+ * @param collection - Collection to search (defaults to COLLECTION_NAME)
+ * @param limit - Max results
+ * @returns Search results with total timing
+ */
+export async function searchWithQCI(
+    text: string,
+    collection: string = COLLECTION_NAME,
+    limit: number = 5,
+): Promise<BenchmarkSearchResult> {
+    const qdrantClient = getQdrantClient();
+    const startTime = performance.now();
+
+    // QCI: Single call with Document query - embedding happens server-side
+    const searchResult = await qdrantClient.query(collection, {
+        query: {
+            text,
+            model: 'jinaai/jina-embeddings-v2-base-en',
+            options: {
+                'jina-api-key': JINA_API_KEY,
+            },
+        },
+        limit,
+        with_payload: true,
+    });
+
+    const endTime = performance.now();
+
+    const results: SearchHit[] = searchResult.points.map((hit) => ({
+        id: hit.id,
+        score: hit.score || 0,
+        payload: hit.payload as unknown as DocumentPayload,
+    }));
+
+    return {
+        results,
+        timing_ms: Math.round(endTime - startTime),
+        mode: 'qdrant',
+    };
+}
+
+/**
  * Generates embeddings using Qdrant Cloud Inference.
  * In production, this would use the in-cluster embedding endpoint.
  * For this demo, it uses Jina API with QCI-like timing simulation.
@@ -134,6 +230,7 @@ export async function embedWithJinaApi(
  * @param text - Text to embed
  * @param model - Model to use
  * @returns Embedding result with timing information
+ * @deprecated Use searchWithQCI for real QCI benchmarks
  */
 export async function embedWithQdrantCloudInference(
     text: string,

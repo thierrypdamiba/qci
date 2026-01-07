@@ -1,42 +1,45 @@
 /**
  * Benchmark API Route
  *
- * Tests embedding performance across different modes.
- * Tries real services first, falls back to simulation if unavailable.
+ * Tests REAL end-to-end search performance across different modes.
+ * Queries the triviaqa_wiki_large collection (4800 Wikipedia articles).
  */
 
 import {NextResponse} from 'next/server';
-import type {EmbeddingMode, BenchmarkResponse} from '@/types';
-import {getEmbeddingWithFallback} from '@/lib/embedding-service';
+import type {BenchmarkResponse} from '@/types';
+import {searchWithJinaEmbed, searchWithQCI} from '@/lib/qdrant';
+import {embedLocally, isLocalEmbeddingAvailable} from '@/lib/localEmbeddings';
+import {getQdrantClient} from '@/lib/qdrant';
 
 // =============================================================================
 // Constants
 // =============================================================================
 
 /**
- * Simulated latencies for fallback (ms).
+ * Wikipedia collection for benchmarking.
  */
-const SIMULATED_LATENCY: Record<EmbeddingMode | 'api', number> = {
-    local: 800,
-    api: 500,
-    jina: 500,
-    qdrant: 60,
-};
+const BENCHMARK_COLLECTION = 'triviaqa_wiki_large';
 
 /**
- * Payload sizes for bandwidth simulation (bytes).
+ * Sample Wikipedia queries for benchmarking.
  */
-const PAYLOAD_SIZES: Record<EmbeddingMode | 'api', number> = {
-    local: 1024 * 4,  // Vector: 1024 dims * 4 bytes
-    api: 1024 * 4,
-    jina: 1024 * 4,
-    qdrant: 0,        // Just text, no vector transfer
-};
+const SAMPLE_QUERIES = [
+    'What is the speed of light?',
+    'Who invented the telephone?',
+    'When did World War 2 end?',
+    'What is photosynthesis?',
+    'Who wrote Romeo and Juliet?',
+];
 
 /**
- * Default test text for benchmarking.
+ * Payload sizes for bandwidth display (bytes).
  */
-const DEFAULT_TEST_TEXT = 'We are going to cut off their air supply. Everything they are selling, we are going to give away for free.';
+const PAYLOAD_SIZES = {
+    local: 768 * 4,   // Vector: 768 dims * 4 bytes
+    api: 768 * 4,
+    jina: 768 * 4,
+    qdrant: 50,       // Just text query, ~50 bytes
+};
 
 // =============================================================================
 // Route Handler
@@ -50,92 +53,85 @@ interface RequestBody {
 /**
  * POST /api/benchmark
  *
- * Runs an embedding benchmark for the specified mode.
+ * Runs a REAL end-to-end search benchmark for the specified mode.
+ * Queries the Wikipedia collection with actual embedding + search.
  *
  * Query params:
- * - mode: 'local' | 'api' | 'jina' | 'qdrant' (default: 'local')
+ * - mode: 'local' | 'api' | 'qdrant' (default: 'local')
  *
  * Body:
- * - text: string - Text to embed (default: sample quote)
+ * - text: string - Query text (default: random sample query)
  * - use_hybrid: boolean - Whether to use hybrid mode (default: false)
  */
 export async function POST(req: Request): Promise<NextResponse<BenchmarkResponse>> {
     const {searchParams} = new URL(req.url);
     const modeParam = searchParams.get('mode') || 'local';
     const body: RequestBody = await req.json();
-    const text = body.text || DEFAULT_TEST_TEXT;
-    const useHybrid = body.use_hybrid || false;
 
-    // Map 'api' mode to 'jina' for internal processing
-    const mode: EmbeddingMode = modeParam === 'api' ? 'jina' : modeParam as EmbeddingMode;
-
-    const start = Date.now();
+    // Use provided text or random sample query
+    const text = body.text || SAMPLE_QUERIES[Math.floor(Math.random() * SAMPLE_QUERIES.length)];
 
     try {
-        // Try real embedding service first
-        const result = await getEmbeddingWithFallback(text, mode);
+        let latency: number;
+        let simulated = false;
+        let resultText = '';
 
-        let latency = result.timing_ms;
+        if (modeParam === 'qdrant') {
+            // Real QCI: Single API call, embedding happens server-side
+            const result = await searchWithQCI(text, BENCHMARK_COLLECTION, 3);
+            latency = result.timing_ms;
+            resultText = result.results[0]?.payload?.text?.slice(0, 100) || 'No results';
 
-        // Apply binary quantization speedup simulation for qdrant mode
-        if (mode === 'qdrant' && !result.simulated && latency > 40) {
-            latency = Math.floor(latency * 0.7); // BQ typically 30-40% faster
+        } else if (modeParam === 'api' || modeParam === 'jina') {
+            // Real Jina: Embed via Jina API, then search Qdrant
+            const result = await searchWithJinaEmbed(text, BENCHMARK_COLLECTION, 3);
+            latency = result.timing_ms;
+            resultText = result.results[0]?.payload?.text?.slice(0, 100) || 'No results';
+
+        } else if (modeParam === 'local') {
+            // Local: Embed locally, then search Qdrant
+            const available = await isLocalEmbeddingAvailable();
+            if (available) {
+                const startTime = performance.now();
+                const embedResult = await embedLocally(text);
+                const client = getQdrantClient();
+                const searchResult = await client.search(BENCHMARK_COLLECTION, {
+                    vector: embedResult.embedding,
+                    limit: 3,
+                    with_payload: true,
+                });
+                latency = Math.round(performance.now() - startTime);
+                resultText = (searchResult[0]?.payload as {text?: string})?.text?.slice(0, 100) || 'No results';
+            } else {
+                // Fallback: simulate local latency
+                simulated = true;
+                await new Promise(resolve => setTimeout(resolve, 800));
+                latency = 800;
+                resultText = 'Local embedding unavailable - simulated';
+            }
+        } else {
+            throw new Error(`Unknown mode: ${modeParam}`);
         }
 
-        // Hybrid mode adds slight overhead
-        if (useHybrid) {
-            latency += 20;
-        }
-
-        // Calculate payload size
-        const payloadSize = mode === 'qdrant'
-            ? Buffer.byteLength(text, 'utf8')
-            : PAYLOAD_SIZES[mode];
+        const payloadSize = PAYLOAD_SIZES[modeParam as keyof typeof PAYLOAD_SIZES] || 0;
 
         return NextResponse.json({
             latency,
             bandwidth: `${payloadSize} bytes`,
-            result: DEFAULT_TEST_TEXT,
-            mode,
-            simulated: result.simulated,
+            result: resultText,
+            mode: modeParam as 'local' | 'jina' | 'qdrant',
+            simulated,
         });
+
     } catch (error) {
-        // Fall back to pure simulation
-        console.warn(`Benchmark fallback for mode ${mode}:`, error);
-
-        const simulatedLatency = SIMULATED_LATENCY[modeParam as keyof typeof SIMULATED_LATENCY] || 200;
-
-        // Simulate the delay
-        await simulateDelay(simulatedLatency, mode);
-
-        const duration = Date.now() - start;
+        console.error(`Benchmark error for mode ${modeParam}:`, error);
 
         return NextResponse.json({
-            latency: duration,
-            bandwidth: `${PAYLOAD_SIZES[mode]} bytes`,
-            result: DEFAULT_TEST_TEXT,
-            mode,
+            latency: 0,
+            bandwidth: '0 bytes',
+            result: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            mode: modeParam as 'local' | 'jina' | 'qdrant',
             simulated: true,
         });
-    }
-}
-
-// =============================================================================
-// Helper Functions
-// =============================================================================
-
-/**
- * Simulates delay for fallback mode.
- */
-async function simulateDelay(baseLatency: number, mode: EmbeddingMode): Promise<void> {
-    if (mode === 'local') {
-        // Simulate CPU-bound work
-        const end = Date.now() + baseLatency;
-        while (Date.now() < end) {
-            Math.random();
-        }
-    } else {
-        // Simulate network delay
-        await new Promise((resolve) => setTimeout(resolve, baseLatency));
     }
 }

@@ -1,11 +1,22 @@
 'use client';
 import {useState} from 'react';
-import { PlayCircle, CheckCircle, Activity, ArrowLeft, BarChart2 } from 'lucide-react';
+import { PlayCircle, CheckCircle, Activity, ArrowLeft, BarChart2, Search } from 'lucide-react';
 import Link from 'next/link';
+
+const SAMPLE_QUERIES = [
+    'What is the speed of light?',
+    'Who invented the telephone?',
+    'When did World War 2 end?',
+    'What is photosynthesis?',
+    'Who wrote Romeo and Juliet?',
+];
 
 export default function Benchmark() {
     const [running, setRunning] = useState(false);
     const [useHybrid, setUseHybrid] = useState(false);
+    const [selectedQuery, setSelectedQuery] = useState(SAMPLE_QUERIES[0]);
+    const [customQuery, setCustomQuery] = useState('');
+    const [useCustom, setUseCustom] = useState(false);
 
     // Results State
     const [results, setResults] = useState({
@@ -14,7 +25,11 @@ export default function Benchmark() {
         qdrant: { latency: 0, width: 0 }
     });
 
+    const currentQuery = useCustom ? customQuery : selectedQuery;
+
     const runBenchmark = async () => {
+        if (!currentQuery.trim()) return;
+
         setRunning(true);
 
         // Reset UI
@@ -24,12 +39,10 @@ export default function Benchmark() {
             qdrant: { latency: 0, width: 0 }
         });
 
-        const query = "strategy to kill netscape";
-
         await Promise.all([
-            runLane('local', query),
-            runLane('api', query),
-            runLane('qdrant', query, useHybrid)
+            runLane('local', currentQuery),
+            runLane('api', currentQuery),
+            runLane('qdrant', currentQuery, useHybrid)
         ]);
 
         setRunning(false);
@@ -207,14 +220,49 @@ export default function Benchmark() {
 
             </div>
 
-            {/* Code Peek Footer */}
-            <div className="mt-8 bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-lg p-4 flex gap-8 items-center text-xs font-mono text-slate-400">
-                <div>Query: <span className="text-white">"strategy to kill netscape"</span></div>
-                <div className="h-4 w-[1px] bg-slate-700"></div>
-                <div>Active Model: <span className="text-white">Jina v3 (1024d)</span></div>
-                <div className="h-4 w-[1px] bg-slate-700"></div>
-                <div className={`text-blue-400 transition-opacity duration-300 ${useHybrid ? 'opacity-100' : 'opacity-0'}`}>
-                    client.query_points(fusion=RRF)
+            {/* Query Selection */}
+            <div className="mt-8 bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-lg p-4">
+                <div className="flex items-center gap-3 mb-3">
+                    <Search className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm font-medium text-slate-300">Query Wikipedia (4,800 articles)</span>
+                </div>
+
+                {/* Sample queries */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                    {SAMPLE_QUERIES.map((q, i) => (
+                        <button
+                            key={i}
+                            onClick={() => { setSelectedQuery(q); setUseCustom(false); }}
+                            className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
+                                !useCustom && selectedQuery === q
+                                    ? 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                            }`}
+                        >
+                            {q}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Custom query input */}
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        placeholder="Or type your own query..."
+                        value={customQuery}
+                        onChange={(e) => { setCustomQuery(e.target.value); setUseCustom(true); }}
+                        onFocus={() => setUseCustom(true)}
+                        className={`flex-1 px-3 py-2 bg-slate-800/50 border rounded text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                            useCustom ? 'border-blue-500/50' : 'border-slate-700'
+                        }`}
+                    />
+                </div>
+
+                {/* Current query display */}
+                <div className="mt-3 pt-3 border-t border-slate-700/50 flex gap-6 items-center text-xs font-mono text-slate-400">
+                    <div>Active: <span className="text-white">"{currentQuery}"</span></div>
+                    <div className="h-3 w-[1px] bg-slate-700"></div>
+                    <div>Model: <span className="text-white">jina-embeddings-v2-base-en</span></div>
                 </div>
             </div>
 

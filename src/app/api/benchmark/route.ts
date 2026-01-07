@@ -135,13 +135,10 @@ export async function POST(req: Request): Promise<NextResponse<BenchmarkResponse
     } catch (error) {
         console.error(`Benchmark error for mode ${modeParam}:`, error);
 
-        // Debug: check env vars
-        const debugInfo = modeParam === 'qdrant' ? ` [JINA_KEY_LEN=${process.env.JINA_API_KEY?.length || 0}]` : '';
-
         return NextResponse.json({
             latency: 0,
             bandwidth: '0 bytes',
-            result: `Error: ${error instanceof Error ? error.message : 'Unknown error'}${debugInfo}`,
+            result: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
             mode: modeParam as 'local' | 'jina' | 'qdrant',
             simulated: true,
         });

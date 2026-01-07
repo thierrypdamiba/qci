@@ -217,13 +217,6 @@ export async function searchWithQCI(
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error('QCI query failed:', {
-            status: response.status,
-            error: errorText,
-            url: `${QDRANT_URL}/collections/${collection}/points/query`,
-            hasJinaKey: !!JINA_API_KEY,
-            jinaKeyLength: JINA_API_KEY?.length || 0,
-        });
         throw new Error(`QCI query failed: ${response.status} - ${errorText}`);
     }
 

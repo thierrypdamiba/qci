@@ -4,33 +4,33 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Server, Cloud, Cpu, Clock, DollarSign, Shield, Zap } from 'lucide-react';
 
-// Production benchmarks (Vercel deployment)
+// Production benchmarks (MaxQ on Qdrant Cloud, 10k-23k vectors)
 const BENCHMARK_DATA = {
   local: {
     name: 'Local Embedding',
-    subtitle: 'FastEmbed / Sentence Transformers',
+    subtitle: 'Sentence Transformers on CPU',
     coldStart: 34000,
-    warmEmbed: 17,
-    search: 43,
-    totalWarm: 63,
+    warmEmbed: 150,
+    search: 55,
+    totalWarm: 205,
     color: 'emerald',
   },
   external: {
-    name: 'External API (Production)',
-    subtitle: 'Jina API via Vercel Serverless',
-    coldStart: 4500,
-    warmEmbed: 258,
-    search: 87,
-    totalWarm: 345,
+    name: 'External API',
+    subtitle: 'Jina API + Qdrant',
+    coldStart: 0,
+    warmEmbed: 475,
+    search: 55,
+    totalWarm: 530,
     color: 'slate',
   },
   qci: {
     name: 'Qdrant Cloud Inference',
     subtitle: 'Embed + Search in one call',
     coldStart: 0,
-    warmEmbed: 25,
-    search: 43,
-    totalWarm: 70,
+    warmEmbed: 375,
+    search: 55,
+    totalWarm: 430,
     color: 'amber',
   },
 };
@@ -151,7 +151,7 @@ export default function ComparePage() {
                     <span className="text-xs text-blue-400 mt-1 font-medium">Embedding</span>
                     <span className="text-xs text-blue-400/60">API</span>
                   </div>
-                  <span className="text-xs text-blue-400 mt-2 font-mono">~258ms</span>
+                  <span className="text-xs text-blue-400 mt-2 font-mono">~475ms</span>
                 </div>
 
                 {/* Arrow 2 */}
@@ -189,7 +189,7 @@ export default function ComparePage() {
                     <span className="text-xs text-purple-400 mt-1 font-medium">Vector</span>
                     <span className="text-xs text-purple-400/60">Database</span>
                   </div>
-                  <span className="text-xs text-purple-400 mt-2 font-mono">~87ms</span>
+                  <span className="text-xs text-purple-400 mt-2 font-mono">~55ms</span>
                 </div>
 
                 {/* Arrow 4 */}
@@ -213,7 +213,7 @@ export default function ComparePage() {
 
               <div className="mt-8 pt-6 border-t border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-6 text-sm">
-                  <span className="text-zinc-500">Total latency: <span className="text-zinc-300 font-mono">~345ms</span></span>
+                  <span className="text-zinc-500">Total latency: <span className="text-zinc-300 font-mono">~530ms</span></span>
                   <span className="text-zinc-600">|</span>
                   <span className="text-zinc-500">Vendors: <span className="text-zinc-300">2</span></span>
                   <span className="text-zinc-600">|</span>
@@ -264,7 +264,7 @@ export default function ComparePage() {
                       </div>
                     </div>
                   </div>
-                  <span className="text-sm text-amber-400 mt-3 font-mono font-bold">~70ms</span>
+                  <span className="text-sm text-amber-400 mt-3 font-mono font-bold">~430ms</span>
                 </div>
 
                 {/* Arrow back */}
@@ -288,13 +288,13 @@ export default function ComparePage() {
 
               <div className="mt-8 pt-6 border-t border-amber-500/20 flex items-center justify-between">
                 <div className="flex items-center gap-6 text-sm">
-                  <span className="text-zinc-500">Total latency: <span className="text-amber-400 font-mono font-bold">~70ms</span></span>
+                  <span className="text-zinc-500">Total latency: <span className="text-amber-400 font-mono font-bold">~430ms</span></span>
                   <span className="text-zinc-600">|</span>
                   <span className="text-zinc-500">Vendors: <span className="text-amber-400 font-bold">1</span></span>
                   <span className="text-zinc-600">|</span>
                   <span className="text-zinc-500">Data transfer: <span className="text-amber-400">text only</span></span>
                 </div>
-                <span className="text-sm text-green-400 font-bold">5x faster</span>
+                <span className="text-sm text-green-400 font-bold">~20% faster</span>
               </div>
             </div>
 
@@ -314,7 +314,7 @@ export default function ComparePage() {
             <div>
               <h2 className="text-2xl font-light mb-4">Measured latency</h2>
               <p className="text-zinc-400 max-w-2xl">
-                Real numbers from production (Vercel + Qdrant Cloud). Tested with 23,000 documents,
+                Real numbers from production benchmarks on Qdrant Cloud. Tested with 10k-23k documents,
                 768-dimension vectors, HNSW-indexed.
               </p>
             </div>
@@ -410,9 +410,9 @@ export default function ComparePage() {
                   <p className="text-xs text-zinc-600 mt-2">Model download + init</p>
                 </div>
                 <div className="p-4 bg-zinc-800/50 rounded-lg text-center">
-                  <div className="text-3xl font-light text-yellow-400 mb-1">4-7s</div>
+                  <div className="text-3xl font-light text-green-400 mb-1">0s</div>
                   <div className="text-xs text-zinc-500">External API</div>
-                  <p className="text-xs text-zinc-600 mt-2">Connection warmup</p>
+                  <p className="text-xs text-zinc-600 mt-2">Always available</p>
                 </div>
                 <div className="p-4 bg-zinc-800/50 rounded-lg text-center border border-amber-500/20">
                   <div className="text-3xl font-light text-green-400 mb-1">0s</div>
@@ -529,7 +529,7 @@ export default function ComparePage() {
                 <div>
                   <h4 className="text-xs font-medium text-emerald-400 uppercase tracking-wide mb-2">Excels at</h4>
                   <ul className="space-y-1.5 text-sm text-zinc-400">
-                    <li>Lowest warm latency (17ms embed)</li>
+                    <li>Lowest warm latency (~150ms embed)</li>
                     <li>No per-request costs</li>
                     <li>Full model control</li>
                     <li>Works offline</li>
@@ -573,7 +573,7 @@ export default function ComparePage() {
                 <div>
                   <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Falls short</h4>
                   <ul className="space-y-1.5 text-sm text-zinc-500">
-                    <li>~260ms network overhead</li>
+                    <li>~475ms API latency</li>
                     <li>Rate limits at scale</li>
                     <li>Two vendor dependencies</li>
                     <li>Cold start on serverless</li>
@@ -671,11 +671,11 @@ export default function ComparePage() {
         <section className="mt-16 pt-8 border-t border-zinc-800">
           <h4 className="text-xs font-medium text-zinc-600 uppercase tracking-wide mb-3">Methodology</h4>
           <p className="text-xs text-zinc-600 max-w-2xl leading-relaxed">
-            Production benchmarks from Vercel serverless (US regions). Local embedding uses FastEmbed
-            with jinaai/jina-embeddings-v2-base-en on MacBook Pro M2 (16GB). External API uses
-            Jina Embeddings API. QCI estimates based on eliminating client-intermediary network hops.
-            Qdrant Cloud deployed on AWS us-west-2 with HNSW indexing. Scale tested from 35 to 23,000
-            documents (768-dim vectors). Search latency stayed under 50ms at all scales. P50 from 5-query warm runs.
+            Production benchmarks using MaxQ benchmark harness. Local embedding uses sentence-transformers
+            with jina-embeddings-v2-base-en. External API uses Jina Embeddings API + separate Qdrant search.
+            QCI uses Qdrant Cloud Inference with same Jina model. Qdrant Cloud deployed on AWS us-west-2
+            with HNSW indexing. Tested on 10k-23k document collections (768-dim vectors). Search-only
+            latency ~55ms P50. End-to-end latencies measured over 10+ warm queries per collection.
           </p>
         </section>
       </main>

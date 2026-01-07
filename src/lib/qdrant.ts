@@ -191,28 +191,40 @@ export async function searchWithQCI(
     collection: string = COLLECTION_NAME,
     limit: number = 5,
 ): Promise<BenchmarkSearchResult> {
-    const qdrantClient = getQdrantClient();
     const startTime = performance.now();
 
-    // QCI: Single call with Document query - embedding happens server-side
-    const searchResult = await qdrantClient.query(collection, {
-        query: {
-            text,
-            model: 'jinaai/jina-embeddings-v2-base-en',
-            options: {
-                'jina-api-key': JINA_API_KEY,
-            },
+    // QCI: Direct REST API call with Document query
+    const response = await fetch(`${QDRANT_URL}/collections/${collection}/points/query`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'api-key': QDRANT_API_KEY,
         },
-        limit,
-        with_payload: true,
+        body: JSON.stringify({
+            query: {
+                text,
+                model: 'jinaai/jina-embeddings-v2-base-en',
+                options: {
+                    'jina-api-key': JINA_API_KEY,
+                },
+            },
+            limit,
+            with_payload: true,
+        }),
     });
 
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`QCI query failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
     const endTime = performance.now();
 
-    const results: SearchHit[] = searchResult.points.map((hit) => ({
+    const results: SearchHit[] = (data.result?.points || []).map((hit: {id: string | number; score?: number; payload?: DocumentPayload}) => ({
         id: hit.id,
         score: hit.score || 0,
-        payload: hit.payload as unknown as DocumentPayload,
+        payload: hit.payload as DocumentPayload,
     }));
 
     return {

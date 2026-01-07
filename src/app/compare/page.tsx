@@ -649,22 +649,32 @@ export default function ComparePage() {
         )}
 
         <section className="mt-20 pt-12 border-t border-zinc-800 text-center">
-          <p className="text-zinc-500 mb-6">See the numbers in action</p>
-          <div className="flex gap-4 justify-center">
-            <Link
-              href="/benchmark"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500/10 text-amber-400
-                         border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors"
-            >
-              Run Live Benchmark <ArrowRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-800 text-zinc-300
-                         border border-zinc-700 rounded-lg hover:bg-zinc-700 transition-colors"
-            >
-              Try Co-Counsel Demo
-            </Link>
+          <p className="text-zinc-500 mb-8">See the numbers in action</p>
+          <div className="flex gap-6 justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <Link
+                href="/benchmark"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500/10 text-amber-400
+                           border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors"
+              >
+                Run Live Benchmark <ArrowRight className="w-4 h-4" />
+              </Link>
+              <p className="text-xs text-zinc-600 max-w-48">
+                Race all three modes side-by-side on a real query
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-800 text-zinc-300
+                           border border-zinc-700 rounded-lg hover:bg-zinc-700 transition-colors"
+              >
+                Try Co-Counsel Demo
+              </Link>
+              <p className="text-xs text-zinc-600 max-w-48">
+                Interactive legal AI demo with live embedding
+              </p>
+            </div>
           </div>
         </section>
 

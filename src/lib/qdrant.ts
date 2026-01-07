@@ -13,9 +13,9 @@ import {EmbeddingError, SearchError, ConfigurationError} from './errors';
 // Configuration
 // =============================================================================
 
-const QDRANT_URL = process.env.QDRANT_URL || '';
-const QDRANT_API_KEY = process.env.QDRANT_API_KEY || '';
-const JINA_API_KEY = process.env.JINA_API_KEY || '';
+const QDRANT_URL = (process.env.QDRANT_URL || '').trim();
+const QDRANT_API_KEY = (process.env.QDRANT_API_KEY || '').trim();
+const JINA_API_KEY = (process.env.JINA_API_KEY || '').trim();
 const COLLECTION_NAME = process.env.QDRANT_COLLECTION || 'legal_memory';
 
 /**

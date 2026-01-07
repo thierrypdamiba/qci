@@ -193,7 +193,7 @@ export async function searchWithQCI(
 ): Promise<BenchmarkSearchResult> {
     const startTime = performance.now();
 
-    // QCI: Direct REST API call with Document query
+    // QCI: Direct REST API call with Document query wrapped in 'nearest'
     const response = await fetch(`${QDRANT_URL}/collections/${collection}/points/query`, {
         method: 'POST',
         headers: {
@@ -202,10 +202,12 @@ export async function searchWithQCI(
         },
         body: JSON.stringify({
             query: {
-                text,
-                model: 'jinaai/jina-embeddings-v2-base-en',
-                options: {
-                    'jina-api-key': JINA_API_KEY,
+                nearest: {
+                    text,
+                    model: 'jinaai/jina-embeddings-v2-base-en',
+                    options: {
+                        'jina-api-key': JINA_API_KEY,
+                    },
                 },
             },
             limit,

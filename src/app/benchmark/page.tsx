@@ -1,6 +1,6 @@
 'use client';
 import {useState} from 'react';
-import { PlayCircle, CheckCircle, Activity, ArrowLeft, BarChart2, Search } from 'lucide-react';
+import { PlayCircle, CheckCircle, Activity, ArrowLeft, BarChart2, Search, Zap } from 'lucide-react';
 import Link from 'next/link';
 
 const SAMPLE_QUERIES = [
@@ -11,18 +11,25 @@ const SAMPLE_QUERIES = [
     'Who wrote Romeo and Juliet?',
 ];
 
+type ComparisonMode = 'jina' | 'native';
+
 export default function Benchmark() {
     const [running, setRunning] = useState(false);
     const [useHybrid, setUseHybrid] = useState(false);
     const [selectedQuery, setSelectedQuery] = useState(SAMPLE_QUERIES[0]);
     const [customQuery, setCustomQuery] = useState('');
     const [useCustom, setUseCustom] = useState(false);
+    const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('native');
 
-    // Results State
+    // Results State - includes both comparison modes
     const [results, setResults] = useState({
+        // Jina comparison (768d)
         local: { latency: 0, width: 0 },
         api: { latency: 0, width: 0 },
-        qdrant: { latency: 0, width: 0 }
+        qdrant: { latency: 0, width: 0 },
+        // Native comparison (384d) - fair comparison
+        hf: { latency: 0, width: 0 },
+        native: { latency: 0, width: 0 },
     });
 
     const currentQuery = useCustom ? customQuery : selectedQuery;
@@ -32,32 +39,45 @@ export default function Benchmark() {
 
         setRunning(true);
 
-        // Reset UI
-        setResults({
-            local: { latency: 0, width: 0 },
-            api: { latency: 0, width: 0 },
-            qdrant: { latency: 0, width: 0 }
-        });
-
-        await Promise.all([
-            runLane('local', currentQuery),
-            runLane('api', currentQuery),
-            runLane('qdrant', currentQuery, useHybrid)
-        ]);
+        // Reset UI based on comparison mode
+        if (comparisonMode === 'native') {
+            setResults(prev => ({
+                ...prev,
+                hf: { latency: 0, width: 0 },
+                native: { latency: 0, width: 0 },
+            }));
+            await Promise.all([
+                runLane('hf', currentQuery),
+                runLane('native', currentQuery),
+            ]);
+        } else {
+            setResults(prev => ({
+                ...prev,
+                local: { latency: 0, width: 0 },
+                api: { latency: 0, width: 0 },
+                qdrant: { latency: 0, width: 0 },
+            }));
+            await Promise.all([
+                runLane('local', currentQuery),
+                runLane('api', currentQuery),
+                runLane('qdrant', currentQuery, useHybrid),
+            ]);
+        }
 
         setRunning(false);
     };
 
-    const runLane = async (mode: 'local' | 'api' | 'qdrant', query: string, hybrid = false) => {
-        // Fake visual progress
+    const runLane = async (mode: 'local' | 'api' | 'qdrant' | 'hf' | 'native', query: string, hybrid = false) => {
+        // Fake visual progress - native modes are faster
         let p = 0;
+        const speedMap = { native: 12, hf: 3, qdrant: 8, api: 2, local: 2 };
         const interval = setInterval(() => {
-            const inc = mode === 'qdrant' ? 8 : (mode === 'api' ? 2 : Math.random() * 3);
+            const inc = speedMap[mode] || 3;
             if (p < 90) {
                 p += inc;
                 setResults(prev => ({
                     ...prev,
-                    [mode]: { ...prev[mode], width: p }
+                    [mode]: { ...prev[mode as keyof typeof prev], width: p }
                 }));
             }
         }, 50);
@@ -117,108 +137,196 @@ export default function Benchmark() {
                 </button>
             </div>
 
-            {/* The Grid */}
-            <div className="grid grid-cols-3 gap-6 flex-1">
-
-                {/* CARD 1: LOCAL */}
-                <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl p-6 flex flex-col opacity-80 hover:opacity-100 transition-opacity">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="font-bold text-lg text-slate-300">Local (Laptop)</h2>
-                        <span className="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-red-400">CPU BOUND</span>
-                    </div>
-                    <div className="flex-1 flex flex-col justify-center">
-                        <div className="text-4xl font-mono font-bold text-white mb-2">
-                            {results.local.latency}<span className="text-lg text-slate-500 ml-1">ms</span>
-                        </div>
-                        <div className="bg-[#0f172a] rounded overflow-hidden h-2 mt-2">
-                            <div className="h-full bg-red-500 transition-all duration-1000 ease-out" style={{ width: `${results.local.width}%` }}></div>
-                        </div>
-                        <div className="mt-4 flex justify-between text-xs font-mono text-slate-500">
-                            <span>Payload: 4.2KB</span>
-                            <span>Complexity: High</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* CARD 2: API */}
-                <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl p-6 flex flex-col opacity-80 hover:opacity-100 transition-opacity">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="font-bold text-lg text-slate-300">Jina API</h2>
-                        <span className="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-yellow-400">NETWORK BOUND</span>
-                    </div>
-                    <div className="flex-1 flex flex-col justify-center">
-                        <div className="text-4xl font-mono font-bold text-white mb-2">
-                            {results.api.latency}<span className="text-lg text-slate-500 ml-1">ms</span>
-                        </div>
-                        <div className="bg-[#0f172a] rounded overflow-hidden h-2 mt-2">
-                            <div className="h-full bg-yellow-500 transition-all duration-1000 ease-out" style={{ width: `${results.api.width}%` }}></div>
-                        </div>
-                        <div className="mt-4 flex justify-between text-xs font-mono text-slate-500">
-                            <span>Payload: 4.2KB</span>
-                            <span>Complexity: Med</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* CARD 3: QDRANT (Feature Rich) */}
-                <div className="bg-slate-900/40 backdrop-blur-md border border-blue-500/50 rounded-xl p-6 flex flex-col shadow-[0_0_40px_rgba(59,130,246,0.15)] relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
-
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="font-bold text-lg text-white">Qdrant Cloud</h2>
-                        <span className="text-xs font-mono bg-blue-900/30 border border-blue-500/50 px-2 py-1 rounded text-blue-400">OPTIMIZED</span>
-                    </div>
-
-                    {/* Qdrant Feature Toggles */}
-                    <div className="mb-6 space-y-2 bg-slate-900/50 p-3 rounded border border-white/5">
-
-                        {/* Hybrid Toggle */}
-                        <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                                <span className="text-xs font-bold text-slate-300">Universal Query API</span>
-                                <span className="text-[10px] text-slate-500">Dense + Sparse Fusion (RRF)</span>
-                            </div>
-                            <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                                <input
-                                    type="checkbox"
-                                    id="hybridToggle"
-                                    checked={useHybrid}
-                                    onChange={(e) => setUseHybrid(e.target.checked)}
-                                    className="absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-700 checked:right-0 checked:border-blue-500 transition-all right-full"
-                                    style={{ right: useHybrid ? '0' : 'auto', left: useHybrid ? 'auto' : '0' }}
-                                />
-                                <label
-                                    htmlFor="hybridToggle"
-                                    className={`block overflow-hidden h-5 rounded-full cursor-pointer ${useHybrid ? 'bg-blue-600' : 'bg-slate-700'}`}
-                                ></label>
-                            </div>
-                        </div>
-
-                        {/* Quantization Badge (Visual Only for Demo) */}
-                        <div className="flex items-center justify-between opacity-50">
-                            <div className="flex flex-col">
-                                <span className="text-xs font-bold text-slate-300">Binary Quantization</span>
-                                <span className="text-[10px] text-slate-500">Always-on 30% Speedup</span>
-                            </div>
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                        </div>
-                    </div>
-
-                    <div className="flex-1 flex flex-col justify-center">
-                        <div className="text-6xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-blue-200 mb-2 drop-shadow-[0_0_15px_rgba(56,189,248,0.5)]">
-                            {results.qdrant.latency}<span className="text-2xl text-slate-500 ml-1">ms</span>
-                        </div>
-                        <div className="bg-[#0f172a] rounded overflow-hidden h-2 mt-2">
-                            <div className="h-full bg-blue-500 transition-all duration-1000 ease-out" style={{ width: `${results.qdrant.width}%` }}></div>
-                        </div>
-                        <div className="mt-4 flex justify-between text-xs font-mono text-green-400">
-                            <span>Payload: <span className="text-white">0.05KB</span></span>
-                            <span>Status: <span>{useHybrid ? "HYBRID FUSION" : "DENSE SEARCH"}</span></span>
-                        </div>
-                    </div>
-                </div>
-
+            {/* Comparison Mode Toggle */}
+            <div className="flex gap-2 mb-6">
+                <button
+                    onClick={() => setComparisonMode('native')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                        comparisonMode === 'native'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/50'
+                            : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:border-slate-600'
+                    }`}
+                >
+                    <Zap className="w-4 h-4" />
+                    Fair Comparison (same model)
+                </button>
+                <button
+                    onClick={() => setComparisonMode('jina')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        comparisonMode === 'jina'
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                            : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:border-slate-600'
+                    }`}
+                >
+                    Jina Comparison (768d)
+                </button>
             </div>
+
+            {/* The Grid */}
+            {comparisonMode === 'native' ? (
+                /* NATIVE COMPARISON: HuggingFace API vs QCI Native - SAME MODEL */
+                <div className="grid grid-cols-2 gap-6 flex-1">
+                    {/* CARD: External API baseline */}
+                    <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl p-6 flex flex-col opacity-80 hover:opacity-100 transition-opacity">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="font-bold text-lg text-slate-300">External API + Qdrant</h2>
+                            <span className="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-yellow-400">2 CALLS</span>
+                        </div>
+                        <div className="text-xs text-slate-500 mb-6">
+                            Embed externally → Vector → Qdrant Search
+                        </div>
+                        <div className="flex-1 flex flex-col justify-center">
+                            {results.hf.latency > 0 ? (
+                                <>
+                                    <div className="text-5xl font-mono font-bold text-white mb-2">
+                                        {results.hf.latency}<span className="text-xl text-slate-500 ml-1">ms</span>
+                                    </div>
+                                    <div className="bg-[#0f172a] rounded overflow-hidden h-3 mt-2">
+                                        <div className="h-full bg-yellow-500 transition-all duration-1000 ease-out" style={{ width: `${results.hf.width}%` }}></div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-center py-4">
+                                    <div className="text-3xl font-mono text-slate-500 mb-2">~300-500ms</div>
+                                    <div className="text-xs text-slate-600">Typical external API latency</div>
+                                    <div className="text-xs text-slate-500 mt-2">(Add HF_API_KEY for live test)</div>
+                                </div>
+                            )}
+                            <div className="mt-4 flex justify-between text-xs font-mono text-slate-500">
+                                <span>Model: all-MiniLM-L6-v2</span>
+                                <span>384 dims</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* CARD: QCI Native */}
+                    <div className="bg-slate-900/40 backdrop-blur-md border-2 border-green-500/50 rounded-xl p-6 flex flex-col shadow-[0_0_40px_rgba(34,197,94,0.15)] relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-emerald-500"></div>
+
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="font-bold text-lg text-white">QCI Native</h2>
+                            <span className="text-xs font-mono bg-green-900/30 border border-green-500/50 px-2 py-1 rounded text-green-400">1 CALL</span>
+                        </div>
+                        <div className="text-xs text-green-400/80 mb-6">
+                            Text → Qdrant (embed + search in-cluster)
+                        </div>
+
+                        <div className="flex-1 flex flex-col justify-center">
+                            <div className="text-6xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-green-200 mb-2 drop-shadow-[0_0_15px_rgba(34,197,94,0.5)]">
+                                {results.native.latency}<span className="text-2xl text-slate-500 ml-1">ms</span>
+                            </div>
+                            <div className="bg-[#0f172a] rounded overflow-hidden h-3 mt-2">
+                                <div className="h-full bg-green-500 transition-all duration-1000 ease-out" style={{ width: `${results.native.width}%` }}></div>
+                            </div>
+                            <div className="mt-4 flex justify-between text-xs font-mono">
+                                <span className="text-green-400">Model: all-MiniLM-L6-v2</span>
+                                <span className="text-green-400">Zero external calls</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                /* JINA COMPARISON: Local vs Jina API vs QCI-Jina */
+                <div className="grid grid-cols-3 gap-6 flex-1">
+                    {/* CARD 1: LOCAL */}
+                    <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl p-6 flex flex-col opacity-80 hover:opacity-100 transition-opacity">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="font-bold text-lg text-slate-300">Local (Laptop)</h2>
+                            <span className="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-red-400">CPU BOUND</span>
+                        </div>
+                        <div className="flex-1 flex flex-col justify-center">
+                            <div className="text-4xl font-mono font-bold text-white mb-2">
+                                {results.local.latency}<span className="text-lg text-slate-500 ml-1">ms</span>
+                            </div>
+                            <div className="bg-[#0f172a] rounded overflow-hidden h-2 mt-2">
+                                <div className="h-full bg-red-500 transition-all duration-1000 ease-out" style={{ width: `${results.local.width}%` }}></div>
+                            </div>
+                            <div className="mt-4 flex justify-between text-xs font-mono text-slate-500">
+                                <span>Payload: 4.2KB</span>
+                                <span>Complexity: High</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* CARD 2: API */}
+                    <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl p-6 flex flex-col opacity-80 hover:opacity-100 transition-opacity">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="font-bold text-lg text-slate-300">Jina API</h2>
+                            <span className="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-yellow-400">NETWORK BOUND</span>
+                        </div>
+                        <div className="flex-1 flex flex-col justify-center">
+                            <div className="text-4xl font-mono font-bold text-white mb-2">
+                                {results.api.latency}<span className="text-lg text-slate-500 ml-1">ms</span>
+                            </div>
+                            <div className="bg-[#0f172a] rounded overflow-hidden h-2 mt-2">
+                                <div className="h-full bg-yellow-500 transition-all duration-1000 ease-out" style={{ width: `${results.api.width}%` }}></div>
+                            </div>
+                            <div className="mt-4 flex justify-between text-xs font-mono text-slate-500">
+                                <span>Payload: 4.2KB</span>
+                                <span>Complexity: Med</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* CARD 3: QDRANT (Feature Rich) */}
+                    <div className="bg-slate-900/40 backdrop-blur-md border border-blue-500/50 rounded-xl p-6 flex flex-col shadow-[0_0_40px_rgba(59,130,246,0.15)] relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="font-bold text-lg text-white">Qdrant Cloud</h2>
+                            <span className="text-xs font-mono bg-blue-900/30 border border-blue-500/50 px-2 py-1 rounded text-blue-400">OPTIMIZED</span>
+                        </div>
+
+                        {/* Qdrant Feature Toggles */}
+                        <div className="mb-6 space-y-2 bg-slate-900/50 p-3 rounded border border-white/5">
+
+                            {/* Hybrid Toggle */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-slate-300">Universal Query API</span>
+                                    <span className="text-[10px] text-slate-500">Dense + Sparse Fusion (RRF)</span>
+                                </div>
+                                <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                    <input
+                                        type="checkbox"
+                                        id="hybridToggle"
+                                        checked={useHybrid}
+                                        onChange={(e) => setUseHybrid(e.target.checked)}
+                                        className="absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-700 checked:right-0 checked:border-blue-500 transition-all right-full"
+                                        style={{ right: useHybrid ? '0' : 'auto', left: useHybrid ? 'auto' : '0' }}
+                                    />
+                                    <label
+                                        htmlFor="hybridToggle"
+                                        className={`block overflow-hidden h-5 rounded-full cursor-pointer ${useHybrid ? 'bg-blue-600' : 'bg-slate-700'}`}
+                                    ></label>
+                                </div>
+                            </div>
+
+                            {/* Quantization Badge (Visual Only for Demo) */}
+                            <div className="flex items-center justify-between opacity-50">
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-slate-300">Binary Quantization</span>
+                                    <span className="text-[10px] text-slate-500">Always-on 30% Speedup</span>
+                                </div>
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                            </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col justify-center">
+                            <div className="text-6xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-br from-white to-blue-200 mb-2 drop-shadow-[0_0_15px_rgba(56,189,248,0.5)]">
+                                {results.qdrant.latency}<span className="text-2xl text-slate-500 ml-1">ms</span>
+                            </div>
+                            <div className="bg-[#0f172a] rounded overflow-hidden h-2 mt-2">
+                                <div className="h-full bg-blue-500 transition-all duration-1000 ease-out" style={{ width: `${results.qdrant.width}%` }}></div>
+                            </div>
+                            <div className="mt-4 flex justify-between text-xs font-mono text-green-400">
+                                <span>Payload: <span className="text-white">0.05KB</span></span>
+                                <span>Status: <span>{useHybrid ? "HYBRID FUSION" : "DENSE SEARCH"}</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Query Selection */}
             <div className="mt-8 bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-lg p-4">
@@ -262,7 +370,15 @@ export default function Benchmark() {
                 <div className="mt-3 pt-3 border-t border-slate-700/50 flex gap-6 items-center text-xs font-mono text-slate-400">
                     <div>Active: <span className="text-white">"{currentQuery}"</span></div>
                     <div className="h-3 w-[1px] bg-slate-700"></div>
-                    <div>Model: <span className="text-white">jina-embeddings-v2-base-en</span></div>
+                    <div>Model: <span className={comparisonMode === 'native' ? 'text-green-400' : 'text-white'}>
+                        {comparisonMode === 'native' ? 'all-MiniLM-L6-v2 (384d)' : 'jina-embeddings-v2-base-en (768d)'}
+                    </span></div>
+                    {comparisonMode === 'native' && (
+                        <>
+                            <div className="h-3 w-[1px] bg-slate-700"></div>
+                            <div className="text-green-400">Same model = fair comparison</div>
+                        </>
+                    )}
                 </div>
             </div>
 

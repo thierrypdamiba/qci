@@ -7,9 +7,9 @@
 
 import {NextResponse} from 'next/server';
 import type {BenchmarkResponse} from '@/types';
-import {searchWithJinaEmbed, searchWithQCI} from '@/lib/qdrant';
+import {searchWithJinaEmbed, searchWithQCI, searchWithQCINative, getQdrantClient, NATIVE_COLLECTION} from '@/lib/qdrant';
 import {embedLocally, isLocalEmbeddingAvailable} from '@/lib/localEmbeddings';
-import {getQdrantClient} from '@/lib/qdrant';
+import {embedWithHuggingFace} from '@/lib/huggingface';
 
 // =============================================================================
 // Constants
@@ -35,10 +35,12 @@ const SAMPLE_QUERIES = [
  * Payload sizes for bandwidth display (bytes).
  */
 const PAYLOAD_SIZES = {
-    local: 768 * 4,   // Vector: 768 dims * 4 bytes
-    api: 768 * 4,
-    jina: 768 * 4,
-    qdrant: 50,       // Just text query, ~50 bytes
+    local: 768 * 4,    // Vector: 768 dims * 4 bytes (Jina)
+    api: 768 * 4,      // Jina API
+    jina: 768 * 4,     // Jina API
+    qdrant: 50,        // Just text query, ~50 bytes
+    native: 50,        // QCI native - text only
+    hf: 384 * 4,       // Vector: 384 dims * 4 bytes (all-MiniLM-L6-v2)
 };
 
 // =============================================================================
@@ -118,6 +120,42 @@ export async function POST(req: Request): Promise<NextResponse<BenchmarkResponse
                 latency = 800;
                 resultText = 'Local embedding unavailable - simulated';
             }
+
+        } else if (modeParam === 'native') {
+            // QCI Native: all-MiniLM-L6-v2 in-cluster, zero external calls
+            try {
+                const result = await searchWithQCINative(text, 3);
+                latency = result.timing_ms;
+                const payload = result.results[0]?.payload;
+                resultText = (payload as {title?: string; content?: string})?.title
+                    || (payload as {content?: string})?.content?.slice(0, 100)
+                    || 'No results';
+            } catch (error) {
+                simulated = true;
+                latency = 0;
+                resultText = `Error: ${error instanceof Error ? error.message : 'QCI native failed'}`;
+            }
+
+        } else if (modeParam === 'hf') {
+            // HuggingFace API + Qdrant: Fair comparison with same model as QCI native
+            try {
+                const startTime = performance.now();
+                const embedResult = await embedWithHuggingFace(text);
+                const client = getQdrantClient();
+                const searchResult = await client.search(NATIVE_COLLECTION, {
+                    vector: embedResult.embedding,
+                    limit: 3,
+                    with_payload: true,
+                });
+                latency = Math.round(performance.now() - startTime);
+                const payload = searchResult[0]?.payload as {title?: string; content?: string} | undefined;
+                resultText = payload?.title || payload?.content?.slice(0, 100) || 'No results';
+            } catch (error) {
+                simulated = true;
+                latency = 0;
+                resultText = `Error: ${error instanceof Error ? error.message : 'HF API failed'}`;
+            }
+
         } else {
             throw new Error(`Unknown mode: ${modeParam}`);
         }

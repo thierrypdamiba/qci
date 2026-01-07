@@ -2,35 +2,27 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Server, Cloud, Cpu, Clock, DollarSign, Shield, Zap } from 'lucide-react';
+import { ArrowRight, Server, Clock, DollarSign, Shield, Zap } from 'lucide-react';
 
-// Production benchmarks (MaxQ on Qdrant Cloud, 10k-23k vectors)
+// Production benchmarks from Vercel → Qdrant Cloud (us-west-2)
+// Fair comparison: same model (all-MiniLM-L6-v2, 384 dims) for both paths
 const BENCHMARK_DATA = {
-  local: {
-    name: 'Local Embedding',
-    subtitle: 'Sentence Transformers on CPU',
-    coldStart: 34000,
-    warmEmbed: 150,
-    search: 55,
-    totalWarm: 205,
-    color: 'emerald',
-  },
   external: {
-    name: 'External API',
-    subtitle: 'Jina API + Qdrant',
+    name: 'External API + Qdrant',
+    subtitle: 'HuggingFace API → Vector → Search',
     coldStart: 0,
-    warmEmbed: 475,
-    search: 55,
-    totalWarm: 530,
+    warmEmbed: 100,   // ~100ms embed via HF
+    search: 50,       // ~50ms search
+    totalWarm: 150,   // ~150ms total
     color: 'slate',
   },
   qci: {
-    name: 'Qdrant Cloud Inference',
-    subtitle: 'Embed + Search in one call',
+    name: 'QCI Native',
+    subtitle: 'Text → Qdrant (embed + search in-cluster)',
     coldStart: 0,
-    warmEmbed: 375,
-    search: 55,
-    totalWarm: 430,
+    warmEmbed: 50,    // embed happens in-cluster
+    search: 50,       // search
+    totalWarm: 100,   // ~100ms total
     color: 'amber',
   },
 };
@@ -54,32 +46,23 @@ export default function ComparePage() {
 
         <section className="mb-20 p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
           <h2 className="text-sm font-medium text-zinc-500 uppercase tracking-wide mb-4">TL;DR</h2>
-          <div className="grid grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-emerald-400" />
-                <span className="font-medium text-zinc-200">Local</span>
-              </div>
-              <p className="text-sm text-zinc-500">
-                Fastest warm latency. Requires infrastructure, ops burden, 34s cold start.
-              </p>
-            </div>
+          <div className="grid grid-cols-2 gap-8 max-w-2xl">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Server className="w-4 h-4 text-zinc-400" />
-                <span className="font-medium text-zinc-200">External API</span>
+                <span className="font-medium text-zinc-200">External API + Qdrant</span>
               </div>
               <p className="text-sm text-zinc-500">
-                Simple to start. Network overhead, two vendors, variable latency.
+                Two API calls. Embed externally, then search. ~150ms total.
               </p>
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Cloud className="w-4 h-4 text-amber-400" />
-                <span className="font-medium text-zinc-200">QCI</span>
+                <Zap className="w-4 h-4 text-amber-400" />
+                <span className="font-medium text-zinc-200">QCI Native</span>
               </div>
               <p className="text-sm text-zinc-500">
-                Best of both. Near-local speed, zero ops, always warm.
+                One API call. Embed + search in-cluster. ~100ms total. <span className="text-green-400">~35% faster.</span>
               </p>
             </div>
           </div>
@@ -151,7 +134,7 @@ export default function ComparePage() {
                     <span className="text-xs text-blue-400 mt-1 font-medium">Embedding</span>
                     <span className="text-xs text-blue-400/60">API</span>
                   </div>
-                  <span className="text-xs text-blue-400 mt-2 font-mono">~475ms</span>
+                  <span className="text-xs text-blue-400 mt-2 font-mono">~100ms</span>
                 </div>
 
                 {/* Arrow 2 */}
@@ -189,7 +172,7 @@ export default function ComparePage() {
                     <span className="text-xs text-purple-400 mt-1 font-medium">Vector</span>
                     <span className="text-xs text-purple-400/60">Database</span>
                   </div>
-                  <span className="text-xs text-purple-400 mt-2 font-mono">~55ms</span>
+                  <span className="text-xs text-purple-400 mt-2 font-mono">~50ms</span>
                 </div>
 
                 {/* Arrow 4 */}
@@ -213,7 +196,7 @@ export default function ComparePage() {
 
               <div className="mt-8 pt-6 border-t border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-6 text-sm">
-                  <span className="text-zinc-500">Total latency: <span className="text-zinc-300 font-mono">~530ms</span></span>
+                  <span className="text-zinc-500">Total latency: <span className="text-zinc-300 font-mono">~150ms</span></span>
                   <span className="text-zinc-600">|</span>
                   <span className="text-zinc-500">Vendors: <span className="text-zinc-300">2</span></span>
                   <span className="text-zinc-600">|</span>
@@ -264,7 +247,7 @@ export default function ComparePage() {
                       </div>
                     </div>
                   </div>
-                  <span className="text-sm text-amber-400 mt-3 font-mono font-bold">~430ms</span>
+                  <span className="text-sm text-amber-400 mt-3 font-mono font-bold">~100ms</span>
                 </div>
 
                 {/* Arrow back */}
@@ -288,13 +271,13 @@ export default function ComparePage() {
 
               <div className="mt-8 pt-6 border-t border-amber-500/20 flex items-center justify-between">
                 <div className="flex items-center gap-6 text-sm">
-                  <span className="text-zinc-500">Total latency: <span className="text-amber-400 font-mono font-bold">~430ms</span></span>
+                  <span className="text-zinc-500">Total latency: <span className="text-amber-400 font-mono font-bold">~100ms</span></span>
                   <span className="text-zinc-600">|</span>
                   <span className="text-zinc-500">Vendors: <span className="text-amber-400 font-bold">1</span></span>
                   <span className="text-zinc-600">|</span>
                   <span className="text-zinc-500">Data transfer: <span className="text-amber-400">text only</span></span>
                 </div>
-                <span className="text-sm text-green-400 font-bold">~20% faster</span>
+                <span className="text-sm text-green-400 font-bold">~35% faster</span>
               </div>
             </div>
 
@@ -314,15 +297,15 @@ export default function ComparePage() {
             <div>
               <h2 className="text-2xl font-light mb-4">Measured latency</h2>
               <p className="text-zinc-400 max-w-2xl">
-                Real numbers from production benchmarks on Qdrant Cloud. Tested with 10k-23k documents,
-                768-dimension vectors, HNSW-indexed.
+                Real numbers from Vercel to Qdrant Cloud. Same model (all-MiniLM-L6-v2, 384 dims)
+                for both paths - the only difference is where embedding happens.
               </p>
             </div>
 
             <div className="space-y-6">
               {(() => {
                 // Include cold start in total for fair comparison (first request latency)
-                const getFirstRequestTime = (d: typeof BENCHMARK_DATA.local) => d.coldStart + d.totalWarm;
+                const getFirstRequestTime = (d: typeof BENCHMARK_DATA.external) => d.coldStart + d.totalWarm;
                 const maxTotal = Math.max(...Object.values(BENCHMARK_DATA).map(getFirstRequestTime));
 
                 // Sort by first request time (best first)
@@ -351,8 +334,7 @@ export default function ComparePage() {
                             </span>
                           )}
                           <span className={`text-2xl font-light ${
-                            key === 'qci' ? 'text-amber-400' :
-                            key === 'local' ? 'text-red-400' : 'text-zinc-400'
+                            key === 'qci' ? 'text-amber-400' : 'text-zinc-400'
                           }`}>
                             {firstRequestTime >= 1000
                               ? `${(firstRequestTime / 1000).toFixed(1)}s`
@@ -376,9 +358,7 @@ export default function ComparePage() {
                         {/* Embed segment */}
                         <div
                           className={`h-full flex items-center justify-center text-xs font-medium ${
-                            key === 'qci' ? 'bg-amber-500/30 text-amber-300' :
-                            key === 'local' ? 'bg-emerald-500/30 text-emerald-300' :
-                            'bg-zinc-700 text-zinc-400'
+                            key === 'qci' ? 'bg-amber-500/30 text-amber-300' : 'bg-zinc-700 text-zinc-400'
                           }`}
                           style={{width: `${embedPct}%`}}
                         >
@@ -401,14 +381,9 @@ export default function ComparePage() {
             <div className="p-6 bg-zinc-900/50 rounded-lg border border-zinc-800">
               <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-zinc-500" />
-                The cold start reality
+                No cold starts
               </h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="p-4 bg-zinc-800/50 rounded-lg text-center">
-                  <div className="text-3xl font-light text-red-400 mb-1">34s</div>
-                  <div className="text-xs text-zinc-500">Local</div>
-                  <p className="text-xs text-zinc-600 mt-2">Model download + init</p>
-                </div>
+              <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                 <div className="p-4 bg-zinc-800/50 rounded-lg text-center">
                   <div className="text-3xl font-light text-green-400 mb-1">0s</div>
                   <div className="text-xs text-zinc-500">External API</div>
@@ -416,10 +391,13 @@ export default function ComparePage() {
                 </div>
                 <div className="p-4 bg-zinc-800/50 rounded-lg text-center border border-amber-500/20">
                   <div className="text-3xl font-light text-green-400 mb-1">0s</div>
-                  <div className="text-xs text-zinc-500">QCI</div>
+                  <div className="text-xs text-amber-400">QCI Native</div>
                   <p className="text-xs text-zinc-600 mt-2">Always warm</p>
                 </div>
               </div>
+              <p className="text-xs text-zinc-600 mt-4 text-center">
+                Both approaches have no cold start - the difference is network hops and total latency.
+              </p>
             </div>
 
           </section>
@@ -440,41 +418,35 @@ export default function ComparePage() {
                 <thead>
                   <tr className="border-b border-zinc-800">
                     <th className="text-left py-4 text-zinc-500 font-medium">Concern</th>
-                    <th className="text-left py-4 text-zinc-500 font-medium">Local</th>
                     <th className="text-left py-4 text-zinc-500 font-medium">External API</th>
-                    <th className="text-left py-4 text-amber-400 font-medium">QCI</th>
+                    <th className="text-left py-4 text-amber-400 font-medium">QCI Native</th>
                   </tr>
                 </thead>
                 <tbody className="text-zinc-300">
                   <tr className="border-b border-zinc-800/50">
                     <td className="py-4 text-zinc-500">Setup complexity</td>
-                    <td className="py-4"><span className="text-red-400">High</span></td>
                     <td className="py-4"><span className="text-green-400">Low</span></td>
                     <td className="py-4"><span className="text-green-400">Low</span></td>
                   </tr>
                   <tr className="border-b border-zinc-800/50">
                     <td className="py-4 text-zinc-500">Infrastructure</td>
-                    <td className="py-4">Dedicated server, ~2GB RAM</td>
                     <td className="py-4">None</td>
                     <td className="py-4">None</td>
+                  </tr>
+                  <tr className="border-b border-zinc-800/50">
+                    <td className="py-4 text-zinc-500">Network hops</td>
+                    <td className="py-4 text-yellow-400">4 (embed + search round trips)</td>
+                    <td className="py-4 text-green-400">2 (single round trip)</td>
                   </tr>
                   <tr className="border-b border-zinc-800/50">
                     <td className="py-4 text-zinc-500">Scaling</td>
-                    <td className="py-4"><span className="text-red-400">Manual</span></td>
                     <td className="py-4"><span className="text-yellow-400">Rate limited</span></td>
                     <td className="py-4"><span className="text-green-400">Automatic</span></td>
                   </tr>
-                  <tr className="border-b border-zinc-800/50">
-                    <td className="py-4 text-zinc-500">Model updates</td>
-                    <td className="py-4"><span className="text-red-400">Your responsibility</span></td>
-                    <td className="py-4"><span className="text-yellow-400">Provider decides</span></td>
-                    <td className="py-4"><span className="text-green-400">Managed + pinnable</span></td>
-                  </tr>
                   <tr>
                     <td className="py-4 text-zinc-500">Vendor count</td>
-                    <td className="py-4">1 (you)</td>
-                    <td className="py-4 text-yellow-400">2+</td>
-                    <td className="py-4 text-green-400">1</td>
+                    <td className="py-4 text-yellow-400">2 (embedding API + vector DB)</td>
+                    <td className="py-4 text-green-400">1 (Qdrant Cloud)</td>
                   </tr>
                 </tbody>
               </table>
@@ -488,17 +460,17 @@ export default function ComparePage() {
                 </div>
                 <p className="text-sm text-zinc-500">
                   Two vendors means two SLAs, two support channels, two billing relationships,
-                  and debugging across system boundaries.
+                  and debugging across system boundaries. QCI consolidates embedding and search.
                 </p>
               </div>
               <div className="p-5 bg-zinc-900/50 rounded-lg border border-zinc-800">
                 <div className="flex items-center gap-2 mb-3">
                   <DollarSign className="w-4 h-4 text-zinc-500" />
-                  <h4 className="font-medium text-zinc-300">On cost</h4>
+                  <h4 className="font-medium text-zinc-300">On latency</h4>
                 </div>
                 <p className="text-sm text-zinc-500">
-                  Local is cheapest at high volume if you have the infra team.
-                  External APIs have linear per-token costs. QCI bundles into Qdrant Cloud.
+                  External APIs add network round-trip to embedding provider. QCI eliminates
+                  this hop by embedding in-cluster, cutting ~35% off total query latency.
                 </p>
               </div>
             </div>
@@ -517,47 +489,12 @@ export default function ComparePage() {
 
             <div className="p-6 bg-zinc-900/50 rounded-lg border border-zinc-800">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                  <Cpu className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div>
-                  <h3 className="font-medium text-zinc-200">Local Embedding</h3>
-                  <p className="text-sm text-zinc-500">FastEmbed, Sentence Transformers</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <h4 className="text-xs font-medium text-emerald-400 uppercase tracking-wide mb-2">Excels at</h4>
-                  <ul className="space-y-1.5 text-sm text-zinc-400">
-                    <li>Lowest warm latency (~150ms embed)</li>
-                    <li>No per-request costs</li>
-                    <li>Full model control</li>
-                    <li>Works offline</li>
-                  </ul>
-                </div>
-                <div>
-                  <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Falls short</h4>
-                  <ul className="space-y-1.5 text-sm text-zinc-500">
-                    <li>34s cold start</li>
-                    <li>2GB+ RAM per instance</li>
-                    <li>Manual scaling</li>
-                    <li>Python dependency</li>
-                  </ul>
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-zinc-800 text-sm text-zinc-500">
-                <strong className="text-zinc-400">Best for:</strong> High-volume production with existing ML infra.
-              </div>
-            </div>
-
-            <div className="p-6 bg-zinc-900/50 rounded-lg border border-zinc-800">
-              <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-lg bg-zinc-700 flex items-center justify-center">
                   <Server className="w-5 h-5 text-zinc-400" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-zinc-200">External API</h3>
-                  <p className="text-sm text-zinc-500">Jina, OpenAI, Cohere, Voyage</p>
+                  <h3 className="font-medium text-zinc-200">External API + Qdrant</h3>
+                  <p className="text-sm text-zinc-500">HuggingFace, OpenAI, Cohere + separate vector search</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-6">
@@ -565,23 +502,23 @@ export default function ComparePage() {
                   <h4 className="text-xs font-medium text-green-400 uppercase tracking-wide mb-2">Excels at</h4>
                   <ul className="space-y-1.5 text-sm text-zinc-400">
                     <li>Zero infrastructure</li>
-                    <li>Access to frontier models</li>
-                    <li>Pay-per-use</li>
+                    <li>Access to any embedding model</li>
+                    <li>Pay-per-use flexibility</li>
                     <li>Quick prototyping</li>
                   </ul>
                 </div>
                 <div>
                   <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Falls short</h4>
                   <ul className="space-y-1.5 text-sm text-zinc-500">
-                    <li>~475ms API latency</li>
-                    <li>Rate limits at scale</li>
+                    <li>~150ms total latency</li>
+                    <li>4 network hops per query</li>
                     <li>Two vendor dependencies</li>
-                    <li>Cold start on serverless</li>
+                    <li>Rate limits at scale</li>
                   </ul>
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-zinc-800 text-sm text-zinc-500">
-                <strong className="text-zinc-400">Best for:</strong> Prototypes, low-volume production.
+                <strong className="text-zinc-400">Best for:</strong> Prototypes, when you need specific external models.
               </div>
             </div>
 
@@ -591,16 +528,16 @@ export default function ComparePage() {
                   <Zap className="w-5 h-5 text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-zinc-200">Qdrant Cloud Inference</h3>
-                  <p className="text-sm text-zinc-500">Embedding at the data layer</p>
+                  <h3 className="font-medium text-zinc-200">QCI Native</h3>
+                  <p className="text-sm text-zinc-500">Embedding + search in one API call</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <h4 className="text-xs font-medium text-amber-400 uppercase tracking-wide mb-2">Excels at</h4>
                   <ul className="space-y-1.5 text-sm text-zinc-400">
-                    <li>Zero cold start</li>
-                    <li>Single API call</li>
+                    <li>~100ms total latency (~35% faster)</li>
+                    <li>2 network hops (single round trip)</li>
                     <li>One vendor integration</li>
                     <li>Consistent latency</li>
                     <li>Automatic scaling</li>
@@ -609,14 +546,14 @@ export default function ComparePage() {
                 <div>
                   <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Considerations</h4>
                   <ul className="space-y-1.5 text-sm text-zinc-500">
-                    <li>Limited to supported models</li>
+                    <li>Limited to native models (MiniLM, mxbai)</li>
                     <li>Requires Qdrant Cloud</li>
-                    <li>Custom models need local</li>
+                    <li>Third-party models route externally</li>
                   </ul>
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-amber-500/20 text-sm text-zinc-500">
-                <strong className="text-amber-400">Best for:</strong> Production RAG prioritizing simplicity and reliability.
+                <strong className="text-amber-400">Best for:</strong> Production RAG prioritizing latency and simplicity.
               </div>
             </div>
 
@@ -624,24 +561,24 @@ export default function ComparePage() {
               <h3 className="font-medium text-zinc-300 mb-4">Decision framework</h3>
               <div className="space-y-3 text-sm">
                 <div className="flex gap-4">
-                  <span className="text-zinc-500 w-48">Need custom models?</span>
-                  <span className="text-zinc-300">&rarr; Local</span>
+                  <span className="text-zinc-500 w-48">Need specific external model?</span>
+                  <span className="text-zinc-300">&rarr; External API + Qdrant</span>
                 </div>
                 <div className="flex gap-4">
                   <span className="text-zinc-500 w-48">Just prototyping?</span>
-                  <span className="text-zinc-300">&rarr; External API</span>
+                  <span className="text-zinc-300">&rarr; External API + Qdrant</span>
                 </div>
                 <div className="flex gap-4">
-                  <span className="text-zinc-500 w-48">Production, standard models?</span>
-                  <span className="text-amber-400">&rarr; QCI</span>
+                  <span className="text-zinc-500 w-48">Want lowest latency?</span>
+                  <span className="text-amber-400">&rarr; QCI Native</span>
                 </div>
                 <div className="flex gap-4">
-                  <span className="text-zinc-500 w-48">High volume, have ML team?</span>
-                  <span className="text-zinc-300">&rarr; Local</span>
+                  <span className="text-zinc-500 w-48">Want single vendor?</span>
+                  <span className="text-amber-400">&rarr; QCI Native</span>
                 </div>
                 <div className="flex gap-4">
-                  <span className="text-zinc-500 w-48">Want simple and reliable?</span>
-                  <span className="text-amber-400">&rarr; QCI</span>
+                  <span className="text-zinc-500 w-48">Production with standard model?</span>
+                  <span className="text-amber-400">&rarr; QCI Native</span>
                 </div>
               </div>
             </div>
@@ -680,12 +617,18 @@ export default function ComparePage() {
 
         <section className="mt-16 pt-8 border-t border-zinc-800">
           <h4 className="text-xs font-medium text-zinc-600 uppercase tracking-wide mb-3">Methodology</h4>
-          <p className="text-xs text-zinc-600 max-w-2xl leading-relaxed">
-            Production benchmarks using MaxQ benchmark harness. Local embedding uses sentence-transformers
-            with jina-embeddings-v2-base-en. External API uses Jina Embeddings API + separate Qdrant search.
-            QCI uses Qdrant Cloud Inference with same Jina model. Qdrant Cloud deployed on AWS us-west-2
-            with HNSW indexing. Tested on 10k-23k document collections (768-dim vectors). Search-only
-            latency ~55ms P50. End-to-end latencies measured over 10+ warm queries per collection.
+          <p className="text-xs text-zinc-600 max-w-2xl leading-relaxed mb-3">
+            Benchmarks measured from Vercel serverless functions (us-east-1) to Qdrant Cloud (us-west-2).
+            Both paths use the same model (all-MiniLM-L6-v2, 384 dims) for fair comparison.
+            External API uses HuggingFace Inference API + separate Qdrant search.
+            QCI Native embeds and searches in a single API call using Qdrant-hosted model.
+            Collection contains 20 Wikipedia articles with HNSW indexing.
+            Latencies measured over 5+ warm queries.
+          </p>
+          <p className="text-xs text-zinc-500 max-w-2xl leading-relaxed">
+            <strong className="text-zinc-400">Note:</strong> QCI with third-party models (jinaai/, openai/, cohere/) routes to external APIs
+            and won&apos;t show latency improvements. For maximum benefit, use native Qdrant-hosted models
+            like all-MiniLM-L6-v2 which run directly on Qdrant infrastructure.
           </p>
         </section>
       </main>

@@ -424,7 +424,71 @@ export async function getCollectionStats(): Promise<{
 }
 
 // =============================================================================
+// QCI Native Model Search
+// =============================================================================
+
+/**
+ * Native QCI model for fair comparison.
+ * Uses all-MiniLM-L6-v2 (384 dims) hosted directly on Qdrant.
+ */
+const NATIVE_MODEL = 'sentence-transformers/all-MiniLM-L6-v2';
+const NATIVE_COLLECTION = 'wiki_minilm';
+
+/**
+ * Runs end-to-end search using QCI with native model.
+ * Zero external API calls - embedding happens entirely in-cluster.
+ *
+ * @param text - Query text
+ * @param limit - Max results
+ * @returns Search results with timing
+ */
+export async function searchWithQCINative(
+    text: string,
+    limit: number = 5,
+): Promise<BenchmarkSearchResult> {
+    const startTime = performance.now();
+
+    const response = await fetch(`${QDRANT_URL}/collections/${NATIVE_COLLECTION}/points/query`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'api-key': QDRANT_API_KEY,
+        },
+        body: JSON.stringify({
+            query: {
+                nearest: {
+                    text,
+                    model: NATIVE_MODEL,
+                },
+            },
+            limit,
+            with_payload: true,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`QCI native query failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const endTime = performance.now();
+
+    const results: SearchHit[] = (data.result?.points || []).map((hit: {id: string | number; score?: number; payload?: DocumentPayload}) => ({
+        id: hit.id,
+        score: hit.score || 0,
+        payload: hit.payload as DocumentPayload,
+    }));
+
+    return {
+        results,
+        timing_ms: Math.round(endTime - startTime),
+        mode: 'qdrant',
+    };
+}
+
+// =============================================================================
 // Exports
 // =============================================================================
 
-export {COLLECTION_NAME, JINA_API_KEY, DEFAULT_MODEL};
+export {COLLECTION_NAME, JINA_API_KEY, DEFAULT_MODEL, NATIVE_MODEL, NATIVE_COLLECTION};

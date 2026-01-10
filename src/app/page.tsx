@@ -20,7 +20,7 @@ const TOUR_STEPS = [
     {
         target: 'right-lane',
         title: 'Comparison Lane',
-        description: 'This lane runs the same analysis using a different embedding method (Jina Cloud or Local). Compare the timing metrics to see the performance difference.',
+        description: 'This lane runs the same analysis using a different embedding method (External API or Local). Compare the timing metrics to see the performance difference.',
         position: 'left'
     },
     {
@@ -623,7 +623,7 @@ export default function Cockpit() {
 
         const modeLabels = {
             qdrant: { name: 'Qdrant Cloud Inference', icon: CloudLightning, color: 'blue' },
-            jina: { name: 'Jina Cloud', icon: CloudLightning, color: 'purple' },
+            jina: { name: 'External API', icon: CloudLightning, color: 'purple' },
             local: { name: 'Local', icon: Laptop, color: 'slate' }
         };
         const modeInfo = modeLabels[mode as keyof typeof modeLabels] || modeLabels.local;
@@ -689,7 +689,7 @@ export default function Cockpit() {
                     {!isIgnored && (
                         <TimelineStep
                             icon={modeInfo.icon}
-                            label={hybridMode ? (isQci ? "Embed Dense + Sparse (In-Cluster)" : (isJina ? "Embed Dense + Sparse (Jina API)" : "Embed Dense + Sparse (Client)")) : (isQci ? "Embed (In-Cluster)" : (isJina ? "Embed (Jina API)" : "Embed (Client)"))}
+                            label={hybridMode ? (isQci ? "Embed Dense + Sparse (In-Cluster)" : (isJina ? "Embed Dense + Sparse (External API)" : "Embed Dense + Sparse (Client)")) : (isQci ? "Embed (In-Cluster)" : (isJina ? "Embed (External API)" : "Embed (Client)"))}
                             value={state.timings.embed_dense > 0 ? `${state.timings.embed_dense + (state.timings.embed_sparse || 0)}ms` : "---"}
                             status={isQci ? "fast" : (isJina ? "ok" : "slow")}
                             expanded={expandedSteps.includes("embed")}
@@ -956,7 +956,7 @@ export default function Cockpit() {
                                 className="appearance-none bg-transparent text-xs font-bold text-blue-300 hover:text-white transition-colors cursor-pointer focus:outline-none pr-4 py-1"
                             >
                                 <option value="qdrant">Qdrant Cloud Inference</option>
-                                <option value="jina">Jina Cloud</option>
+                                <option value="jina">External API</option>
                                 {!isProduction && <option value="local">Local</option>}
                             </select>
                             <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
@@ -970,7 +970,7 @@ export default function Cockpit() {
                                 className="appearance-none bg-transparent text-xs font-bold text-slate-300 hover:text-white transition-colors cursor-pointer focus:outline-none pr-4 py-1"
                             >
                                 <option value="qdrant">Qdrant Cloud Inference</option>
-                                <option value="jina">Jina Cloud</option>
+                                <option value="jina">External API</option>
                                 {!isProduction && <option value="local">Local</option>}
                             </select>
                             <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
@@ -1188,8 +1188,8 @@ export default function Cockpit() {
                                 <span className="text-xs font-bold text-white uppercase tracking-widest truncate max-w-[320px]">
                                     {qciState.timings.total > 0 && localState.timings.total > 0
                                         ? (qciState.timings.total < localState.timings.total
-                                            ? `${leftMode === 'qdrant' ? 'Qdrant Cloud Inference' : (leftMode === 'jina' ? 'Jina' : 'Local')} Wins`
-                                            : `${rightMode === 'qdrant' ? 'Qdrant Cloud Inference' : (rightMode === 'jina' ? 'Jina' : 'Local')} Wins`)
+                                            ? `${leftMode === 'qdrant' ? 'Qdrant Cloud Inference' : (leftMode === 'jina' ? 'External API' : 'Local')} Wins`
+                                            : `${rightMode === 'qdrant' ? 'Qdrant Cloud Inference' : (rightMode === 'jina' ? 'External API' : 'Local')} Wins`)
                                         : 'Performance Comparison'
                                     }
                                 </span>
@@ -1230,7 +1230,7 @@ export default function Cockpit() {
 
                             {/* Right: Qualifier */}
                             <div className="ml-auto text-[11px] text-slate-500 font-medium uppercase tracking-wider">
-                                {leftMode === 'qdrant' ? 'Qdrant Cloud Inference' : (leftMode === 'jina' ? 'Jina' : 'Local')} vs {rightMode === 'qdrant' ? 'Qdrant Cloud Inference' : (rightMode === 'jina' ? 'Jina' : 'Local')}
+                                {leftMode === 'qdrant' ? 'Qdrant Cloud Inference' : (leftMode === 'jina' ? 'External API' : 'Local')} vs {rightMode === 'qdrant' ? 'Qdrant Cloud Inference' : (rightMode === 'jina' ? 'External API' : 'Local')}
                             </div>
                         </div>
 

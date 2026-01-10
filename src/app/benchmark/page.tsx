@@ -23,7 +23,7 @@ export default function Benchmark() {
 
     // Results State - includes both comparison modes
     const [results, setResults] = useState({
-        // Jina comparison (768d)
+        // External API comparison (384d)
         local: { latency: 0, width: 0 },
         api: { latency: 0, width: 0 },
         qdrant: { latency: 0, width: 0 },
@@ -158,7 +158,7 @@ export default function Benchmark() {
                             : 'bg-slate-800/50 text-slate-400 border border-slate-700 hover:border-slate-600'
                     }`}
                 >
-                    Jina Comparison (768d)
+                    External API Comparison (384d)
                 </button>
             </div>
 
@@ -226,7 +226,7 @@ export default function Benchmark() {
                     </div>
                 </div>
             ) : (
-                /* JINA COMPARISON: Local vs Jina API vs QCI-Jina */
+                /* EXTERNAL API COMPARISON: Local vs External API vs QCI */
                 <div className="grid grid-cols-3 gap-6 flex-1">
                     {/* CARD 1: LOCAL */}
                     <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl p-6 flex flex-col opacity-80 hover:opacity-100 transition-opacity">
@@ -251,7 +251,7 @@ export default function Benchmark() {
                     {/* CARD 2: API */}
                     <div className="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-xl p-6 flex flex-col opacity-80 hover:opacity-100 transition-opacity">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="font-bold text-lg text-slate-300">Jina API</h2>
+                            <h2 className="font-bold text-lg text-slate-300">External API</h2>
                             <span className="text-xs font-mono bg-slate-800 px-2 py-1 rounded text-yellow-400">NETWORK BOUND</span>
                         </div>
                         <div className="flex-1 flex flex-col justify-center">

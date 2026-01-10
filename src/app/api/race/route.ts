@@ -28,8 +28,8 @@ const SIMULATED_LATENCY: Record<EmbeddingMode | 'api', number> = {
  */
 const MODE_DISPLAY_NAMES: Record<EmbeddingMode | 'api', string> = {
     local: 'Local (CPU)',
-    api: 'Jina API (Network)',
-    jina: 'Jina API (Network)',
+    api: 'External API (Network)',
+    jina: 'External API (Network)',
     qdrant: 'Qdrant Cloud',
 };
 

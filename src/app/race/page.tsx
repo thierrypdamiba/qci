@@ -99,7 +99,7 @@ export default function DragRace() {
                 {/* HEADER */}
                 <div className="text-center mb-12">
                     <h1 className="text-5xl font-bold text-white mb-2 tracking-wider font-sans">LATENCY <span className="text-blue-600">SHOOTOUT</span></h1>
-                    <p className="text-gray-500 uppercase tracking-widest text-sm">Real-time Architecture Benchmark // Jina v3 (1024d)</p>
+                    <p className="text-gray-500 uppercase tracking-widest text-sm">Real-time Architecture Benchmark // all-MiniLM-L6-v2 (384d)</p>
                 </div>
 
                 {/* RACE TRACK */}
@@ -124,7 +124,7 @@ export default function DragRace() {
                     {/* LANE 2: API */}
                     <div className="mb-8 relative">
                         <div className="flex justify-between text-xs font-bold text-gray-400 mb-2 uppercase">
-                            <span>Lane 2: Jina API Direct</span>
+                            <span>Lane 2: External API</span>
                             <span className={`text-white transition-all ${apiDim ? 'opacity-50' : ''}`}>{apiTime}</span>
                         </div>
                         <div className="h-12 bg-gray-800 rounded-lg overflow-hidden relative border border-gray-700">

@@ -6,11 +6,7 @@
  */
 
 import type {EmbeddingResult, EmbeddingMode} from '@/types';
-import {
-    embedWithJinaApi,
-    embedWithQdrantCloudInference,
-    getSimulatedJinaEmbedding,
-} from './qdrant';
+import {embedWithHuggingFace} from './huggingface';
 import {
     embedLocally,
     getSimulatedLocalEmbedding,
@@ -55,10 +51,8 @@ export async function getEmbedding(
             result = await embedLocally(text);
             break;
         case 'jina':
-            result = await embedWithJinaApi(text);
-            break;
         case 'qdrant':
-            result = await embedWithQdrantCloudInference(text);
+            result = await embedWithHuggingFace(text);
             break;
         default:
             throw new EmbeddingError(`Unknown embedding mode: ${mode}`, mode);
@@ -112,10 +106,13 @@ export async function getSimulatedEmbedding(
             break;
         case 'jina':
         case 'qdrant':
-            result = await getSimulatedJinaEmbedding(text, latency);
-            break;
         default:
-            result = await getSimulatedJinaEmbedding(text, latency);
+            // Simulate HuggingFace embedding (384-dim)
+            await new Promise((r) => setTimeout(r, latency));
+            const hash = text.split('').reduce((acc, char) => ((acc << 5) - acc + char.charCodeAt(0)) | 0, 0);
+            const embedding = new Array(384).fill(0).map((_, i) => Math.cos((hash + i * 17) | 0) * 0.5);
+            result = {embedding, timing_ms: latency, model: 'all-MiniLM-L6-v2', dimension: 384};
+            break;
     }
 
     return {
@@ -136,11 +133,9 @@ export async function isEmbeddingModeAvailable(mode: EmbeddingMode): Promise<boo
         case 'local':
             return await isLocalEmbeddingAvailable();
         case 'jina':
-            // Check if Jina API key is configured
-            return Boolean(process.env.JINA_API_KEY);
         case 'qdrant':
-            // QCI uses Jina in this demo
-            return Boolean(process.env.JINA_API_KEY);
+            // Using HuggingFace API
+            return Boolean(process.env.HF_API_KEY);
         default:
             return false;
     }

@@ -25,7 +25,7 @@ export const TOUR_STEPS: TourStep[] = [
     {
         target: 'right-lane',
         title: 'Comparison Lane',
-        description: 'This lane runs the same analysis using a different embedding method (Jina Cloud or Local). Compare the timing metrics to see the performance difference.',
+        description: 'This lane runs the same analysis using a different embedding method (External API or Local). Compare the timing metrics to see the performance difference.',
         position: 'left',
     },
     {

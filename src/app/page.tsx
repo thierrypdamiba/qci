@@ -1167,12 +1167,12 @@ export default function Cockpit() {
                         <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
                             {/* Left Lane */}
                             <div data-tour="left-lane" className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${leftMode === 'qdrant' ? 'border-blue-500/20' : (leftMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
-                                <Lane title={leftMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (leftMode === 'jina' ? "JINA CLOUD API" : "LOCAL CLIENT EMBEDDING")} state={qciState} hits={qciState.hits} insight={qciState.insight} mode={leftMode} opponentState={localState} hybridMode={hybridMode} />
+                                <Lane title={leftMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (leftMode === 'jina' ? "EXTERNAL API" : "LOCAL CLIENT EMBEDDING")} state={qciState} hits={qciState.hits} insight={qciState.insight} mode={leftMode} opponentState={localState} hybridMode={hybridMode} />
                             </div>
 
                             {/* Right Lane */}
                             <div data-tour="right-lane" className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${rightMode === 'qdrant' ? 'border-blue-500/20' : (rightMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
-                                <Lane title={rightMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (rightMode === 'jina' ? "JINA CLOUD API" : "LOCAL CLIENT EMBEDDING")} state={localState} hits={localState.hits} insight={localState.insight} mode={rightMode} opponentState={qciState} hybridMode={hybridMode} />
+                                <Lane title={rightMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (rightMode === 'jina' ? "EXTERNAL API" : "LOCAL CLIENT EMBEDDING")} state={localState} hits={localState.hits} insight={localState.insight} mode={rightMode} opponentState={qciState} hybridMode={hybridMode} />
                             </div>
                         </div>
 
@@ -1253,7 +1253,7 @@ export default function Cockpit() {
                                     <strong className="text-white">Note:</strong> BM25 sparse vectors are computed the same way across all modes for consistency.
                                 </p>
                                 <p className="text-slate-300 leading-relaxed">
-                                    Qdrant Cloud Inference supports hybrid search natively, but to keep comparisons with Jina Cloud fair,
+                                    Qdrant Cloud Inference supports hybrid search natively, but to keep comparisons with External API fair,
                                     we only vary <strong className="text-purple-300">where dense embeddings are generated</strong> (QCI vs client).
                                     Retrieval behavior remains the same across all modes.
                                 </p>

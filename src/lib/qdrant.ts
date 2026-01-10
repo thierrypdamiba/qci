@@ -1,8 +1,8 @@
 /**
  * Qdrant Client Module
  *
- * Handles vector search and embeddings via Qdrant Cloud.
- * Supports both Jina Cloud API and Qdrant Cloud Inference for embeddings.
+ * Handles vector search via Qdrant Cloud.
+ * Supports QCI native search with sentence-transformers/all-MiniLM-L6-v2.
  */
 
 import {QdrantClient} from '@qdrant/js-client-rest';

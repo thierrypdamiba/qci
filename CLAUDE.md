@@ -26,10 +26,10 @@ node scripts/seed-scale-test.js      # Seed large collection for scale testing
 
 ### Embedding Modes
 
-The app compares three embedding execution environments using the same model (`jina-embeddings-v2-base-en`):
+The app compares three embedding execution environments using the same model (`sentence-transformers/all-MiniLM-L6-v2`, 384 dims):
 
 1. **Local (FastEmbed)** - Python server at `FASTEMBED_URL` (default: localhost:8001)
-2. **Jina Cloud** - External API call to api.jina.ai
+2. **External API (HuggingFace)** - API call to HuggingFace Inference API
 3. **QCI (Qdrant Cloud Inference)** - In-cluster embedding, zero network hops
 
 ### Key Directories
@@ -50,7 +50,7 @@ src/
 ├── data/                # Static data (cases, tour steps)
 ├── hooks/               # Custom React hooks
 ├── lib/                 # Core libraries
-│   ├── qdrant.ts        # Qdrant client & Jina embeddings
+│   ├── qdrant.ts        # Qdrant client & search functions
 │   ├── localEmbeddings.ts # FastEmbed client
 │   ├── embedding-service.ts # Unified embedding service
 │   ├── errors.ts        # Custom error classes
@@ -104,7 +104,7 @@ Required in `.env.local`:
 ```
 QDRANT_URL=         # Qdrant Cloud cluster URL
 QDRANT_API_KEY=     # Qdrant API key
-JINA_API_KEY=       # Jina AI API key
+HF_API_KEY=         # HuggingFace API key (optional, helps with rate limits)
 ```
 
 Optional:
@@ -136,7 +136,7 @@ Universal rules apply to all cases.
 
 ## Qdrant Collection Schema
 
-Collection `legal_memory` with 768-dim vectors (Cosine distance). Payload fields:
+Collection `legal_memory` with 384-dim vectors (Cosine distance) using all-MiniLM-L6-v2. Payload fields:
 - `text` - Document content
 - `doc_type` - RULE, EVIDENCE, or TRANSCRIPT
 - `case_id` - Case identifier or "universal"
@@ -148,7 +148,7 @@ Indexed fields: `case_id`, `doc_type`, `objection_type`
 ## Hybrid Search (from qdrant-hybrid-pipeline patterns)
 
 Configuration in `src/lib/hybrid-search.ts`:
-- Dense embeddings (Jina) for semantic understanding
+- Dense embeddings (all-MiniLM-L6-v2) for semantic understanding
 - Sparse embeddings (BM25) for lexical precision
 - RRF fusion for combining results
 - Multi-tenancy via partition filtering on `case_id`

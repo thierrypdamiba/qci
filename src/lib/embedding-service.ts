@@ -2,7 +2,8 @@
  * Unified Embedding Service
  *
  * Provides a single interface for all embedding modes with graceful fallback.
- * Handles local, Jina Cloud, and Qdrant Cloud Inference modes.
+ * Handles local, External API (HuggingFace), and Qdrant Cloud Inference modes.
+ * All modes use sentence-transformers/all-MiniLM-L6-v2 (384 dims).
  */
 
 import type {EmbeddingResult, EmbeddingMode} from '@/types';

@@ -5,7 +5,7 @@
  * Provides graceful fallback when server is unavailable.
  */
 
-import type {EmbeddingResult, SparseEmbeddingResult} from '@/types';
+import type {EmbeddingResult} from '@/types';
 import {EmbeddingError} from './errors';
 import {getConfig} from './config';
 
@@ -155,49 +155,6 @@ export async function getSimulatedLocalEmbedding(
         timing_ms: simulatedLatency,
         model: DEFAULT_LOCAL_MODEL,
         dimension: 768,
-    };
-}
-
-/**
- * Generates BM25 sparse embeddings for hybrid search.
- * Note: Actual BM25 is computed by Qdrant at search time.
- * This provides timing placeholder for UI display.
- *
- * @param text - The text to process
- * @returns Sparse embedding result with timing
- */
-export async function generateBM25Sparse(text: string): Promise<SparseEmbeddingResult> {
-    const startTime = performance.now();
-
-    // Tokenize text (simplified BM25 preprocessing)
-    const tokens = text
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .split(/\s+/)
-        .filter((t) => t.length > 2);
-
-    // Create term frequency map
-    const termFreq: Record<string, number> = {};
-    for (const token of tokens) {
-        termFreq[token] = (termFreq[token] || 0) + 1;
-    }
-
-    // Convert to sparse format
-    const indices: number[] = [];
-    const values: number[] = [];
-
-    Object.entries(termFreq).forEach(([_term, freq], idx) => {
-        indices.push(idx);
-        values.push(freq);
-    });
-
-    const endTime = performance.now();
-
-    return {
-        indices,
-        values,
-        timing_ms: Math.round(endTime - startTime),
-        model: 'bm25-qdrant',
     };
 }
 

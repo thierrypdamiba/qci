@@ -4,18 +4,17 @@ An interactive demonstration comparing **Qdrant Cloud Inference** with tradition
 
 ## Overview
 
-This demo simulates a real-time legal assistant that analyzes courtroom testimony and provides instant objections based on legal precedent. It compares three different embedding execution environments using the **same model** (`jina-embeddings-v2-base-en`):
+This demo simulates a real-time legal assistant that analyzes courtroom testimony and provides instant objections based on legal precedent. It compares three different embedding execution environments using the **same model** (`sentence-transformers/all-MiniLM-L6-v2`):
 
 1. **Local (FastEmbed)** - Embeddings generated locally via Python FastEmbed server
-2. **Jina Cloud API** - Embeddings via Jina AI's cloud API
+2. **External API (HuggingFace)** - Embeddings via HuggingFace Inference API
 3. **Qdrant Cloud Inference (QCI)** - Embeddings generated in-cluster for minimal latency
 
 ## Key Features
 
 - **Real-time comparison** of embedding latencies across three execution environments
 - **Fair benchmarking** - same model across all modes
-- **Optional hybrid search** - Add BM25 sparse vectors (via QCI) for all modes
-- **Interactive courtroom simulations** - Microsoft, Enron, O.J. Simpson, and Kitzmiller trials
+- **Interactive courtroom simulations** - Microsoft, Enron, and Kitzmiller trials
 - **Live metrics** - See embedding time, search time, and total E2E latency
 
 ## Quick Start
@@ -25,7 +24,7 @@ This demo simulates a real-time legal assistant that analyzes courtroom testimon
 - Node.js 18+
 - Python 3.8+
 - Qdrant Cloud account ([sign up free](https://cloud.qdrant.io))
-- Jina AI API key ([get one free](https://jina.ai))
+- HuggingFace API key (optional, helps with rate limits)
 
 ### Setup
 
@@ -42,7 +41,7 @@ Copy `.env.example` to `.env.local` and add your credentials:
 ```bash
 QDRANT_URL=https://your-cluster.qdrant.io:6333
 QDRANT_API_KEY=your-qdrant-api-key
-JINA_API_KEY=your-jina-api-key
+HF_API_KEY=your-huggingface-api-key
 QDRANT_COLLECTION=legal_memory
 FASTEMBED_URL=http://localhost:8001
 ```
@@ -71,8 +70,8 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│   LOCAL     │     │  JINA CLOUD  │     │   QDRANT    │
-│  FastEmbed  │     │     API      │     │  CLOUD INF  │
+│   LOCAL     │     │  EXTERNAL    │     │   QDRANT    │
+│  FastEmbed  │     │  API (HF)    │     │  CLOUD INF  │
 │  (Server)   │     │              │     │ (In-Cluster)│
 └──────┬──────┘     └──────┬───────┘     └──────┬──────┘
        │                   │                    │
@@ -85,7 +84,7 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 ```
 
 - **Local**: Embedding happens on your machine (Python process), then search in Qdrant
-- **Jina Cloud**: Embedding via Jina API (network call), then search in Qdrant
+- **External API**: Embedding via HuggingFace API (network call), then search in Qdrant
 - **QCI**: Embedding **inside** Qdrant cluster (zero network hops)
 
 ### Performance Comparison
@@ -93,18 +92,10 @@ Navigate to [http://localhost:3000](http://localhost:3000)
 Qdrant Cloud Inference eliminates network latency by running embeddings in-cluster:
 
 - **Local**: CPU-bound, ~200-300ms embedding time
-- **Jina Cloud**: API call overhead, ~50-100ms embedding time
+- **External API**: API call overhead, ~50-100ms embedding time
 - **QCI**: Optimized in-cluster, ~8-20ms embedding time
 
 ## Features
-
-### Hybrid Search (Optional)
-
-Enable "Hybrid (Dense + BM25)" mode to add sparse vectors:
-
-- Uses BM25 sparse embeddings via Qdrant for **all three modes** (fairness)
-- Shows combined dense + sparse retrieval performance
-- Typically improves precision for keyword-heavy queries
 
 ### Multiple Trials
 

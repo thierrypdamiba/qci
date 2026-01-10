@@ -207,7 +207,7 @@ export default function Cockpit() {
     const [audioFinished, setAudioFinished] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
-    // Dual Lane State - Updated model to jina v3
+    // Dual Lane State - Updated model to all-MiniLM-L6-v2
     const [qciState, setQciState] = useState({
         trace: {
             trigger: { label: "Awaiting testimony...", action: "PROCEED" },
@@ -215,7 +215,7 @@ export default function Cockpit() {
             text: "...",
             collection: "---",
             filters: "---",
-            dense: { ms: 0, model: "jina v3", dim: 0 },
+            dense: { ms: 0, model: "all-MiniLM-L6-v2", dim: 0 },
             sparse: { ms: 0, model: "---" },
             hybrid: { dense_k: 0, sparse_k: 0 },
             fusion: { method: "---", results: 0, top_k: "---" },
@@ -233,7 +233,7 @@ export default function Cockpit() {
             text: "...",
             collection: "---",
             filters: "---",
-            dense: { ms: 0, model: "jina v3", dim: 0 },
+            dense: { ms: 0, model: "all-MiniLM-L6-v2", dim: 0 },
             sparse: { ms: 0, model: "---" },
             hybrid: { dense_k: 0, sparse_k: 0 },
             fusion: { method: "---", results: 0, top_k: "---" },
@@ -318,7 +318,7 @@ export default function Cockpit() {
             text: "...",
             collection: "---",
             filters: "---",
-            dense: { ms: 0, model: "jina v3", dim: 0 },
+            dense: { ms: 0, model: "all-MiniLM-L6-v2", dim: 0 },
             sparse: { ms: 0, model: "---" },
             hybrid: { dense_k: 0, sparse_k: 0 },
             fusion: { method: "---", results: 0, top_k: "---" },
@@ -512,7 +512,7 @@ export default function Cockpit() {
                     trace: {
                         ...data.trace,
                         text: query,
-                        dense: { ...data.trace.dense, model: "jina v3" }
+                        dense: { ...data.trace.dense, model: "all-MiniLM-L6-v2" }
                     },
                     hits: data.hits || [],
                     timings: data.timings || { total: 0 },
@@ -654,21 +654,19 @@ export default function Cockpit() {
                             (isJina ? 'text-purple-300' : 'text-slate-300')
                         }`}>{title}</span>
                     </div>
-                    <div className="flex flex-col items-end">
-                        <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-end">
-                                <span className="text-[11px] text-slate-500 uppercase tracking-wider">Embed</span>
-                                <span className={`text-xs font-mono font-bold ${state.timings.embed_dense > 0 ? (isQci ? 'text-green-400' : 'text-slate-300') : 'text-slate-600'}`}>
-                                    {state.timings.embed_dense > 0 ? `${state.timings.embed_dense}ms` : "---"}
-                                </span>
-                            </div>
-                            <div className="w-px h-6 bg-white/10"></div>
-                            <div className="flex flex-col items-end">
-                                <span className="text-[11px] text-slate-500 uppercase tracking-wider">Total E2E</span>
-                                <span className={`text-lg font-mono font-bold ${state.timings.total > 0 ? (state.timings.total < 100 ? 'text-green-400' : 'text-white') : 'text-slate-600'}`}>
-                                    {state.timings.total > 0 ? `${state.timings.total}ms` : "---"}
-                                </span>
-                            </div>
+                    <div className="flex items-start gap-3">
+                        <div className="flex flex-col items-end min-w-[60px]">
+                            <span className="text-[11px] text-slate-500 uppercase tracking-wider">Embed</span>
+                            <span className={`text-sm font-mono font-bold ${state.timings.embed_dense > 0 ? (isQci ? 'text-green-400' : 'text-slate-300') : 'text-slate-600'}`}>
+                                {state.timings.embed_dense > 0 ? `${state.timings.embed_dense}ms` : "---"}
+                            </span>
+                        </div>
+                        <div className="w-px h-8 bg-white/10 self-center"></div>
+                        <div className="flex flex-col items-end min-w-[70px]">
+                            <span className="text-[11px] text-slate-500 uppercase tracking-wider">Total E2E</span>
+                            <span className={`text-lg font-mono font-bold ${state.timings.total > 0 ? (state.timings.total < 100 ? 'text-green-400' : 'text-white') : 'text-slate-600'}`}>
+                                {state.timings.total > 0 ? `${state.timings.total}ms` : "---"}
+                            </span>
                         </div>
                     </div>
                 </div>

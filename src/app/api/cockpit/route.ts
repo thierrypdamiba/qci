@@ -172,7 +172,7 @@ function initializeTrace(text: string, caseId: string, hybridMode: boolean): Pip
         route: {plan: 'rules + case_memory', details: `case=${caseId}, phase=cross`},
         query: {text, filters: `case_id=${caseId}, phase=cross`},
         decision: 'ANALYZING...',
-        dense: {model: 'jina-embeddings-v2-base-en', ms: 0, dim: 768},
+        dense: {model: 'all-MiniLM-L6-v2', ms: 0, dim: 384},
         sparse: {model: hybridMode ? 'bm25' : '---', ms: 0},
         search: {dense_k: 10, sparse_k: 0, retrieved: 0},
         fusion: {method: hybridMode ? 'RRF' : 'Semantic', top_k: 5},

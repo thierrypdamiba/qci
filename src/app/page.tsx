@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import {Mic, Gavel, ShieldCheck, ChevronDown, Activity, Database, Layers, GitMerge, Laptop, Trophy, CloudLightning, RotateCcw, HelpCircle, ChevronLeft, ChevronRight} from 'lucide-react';
+import {Mic, Gavel, ShieldCheck, ChevronDown, Activity, Database, Layers, GitMerge, Laptop, Trophy, CloudLightning, RotateCcw, HelpCircle, ChevronLeft, ChevronRight, Volume2, VolumeX} from 'lucide-react';
 import Link from 'next/link';
 
 // Tour step definitions
@@ -200,6 +200,13 @@ export default function Cockpit() {
 
     const [transcriptLines, setTranscriptLines] = useState<any[]>([]);
 
+    // Voice state
+    const [voiceEnabled, setVoiceEnabled] = useState(false);
+    const [voiceCache] = useState<Map<string, string>>(() => new Map());
+    const [isLoadingVoice, setIsLoadingVoice] = useState(false);
+    const [audioFinished, setAudioFinished] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+
     // Dual Lane State - Updated model to jina v3
     const [qciState, setQciState] = useState({
         trace: {
@@ -247,16 +254,27 @@ export default function Cockpit() {
     useEffect(() => {
         let timer: NodeJS.Timeout;
         if (isPlaying && currentStep < CASES[activeCase].script.length - 1) {
-            // If we haven't started yet (step -1), advance immediately
-            const delay = currentStep === -1 ? 0 : 4000;
-            timer = setTimeout(() => {
-                setCurrentStep(prev => prev + 1);
-            }, delay);
+            if (currentStep === -1) {
+                // First step - advance immediately
+                timer = setTimeout(() => setCurrentStep(prev => prev + 1), 0);
+            } else if (voiceEnabled) {
+                // When voice enabled, wait for audio to finish + 1s pause (natural conversation pace)
+                if (audioFinished) {
+                    timer = setTimeout(() => {
+                        setAudioFinished(false);
+                        setCurrentStep(prev => prev + 1);
+                    }, 1000);
+                }
+                // If audio not finished, wait for onEnded callback
+            } else {
+                // No voice - use 4 second delay
+                timer = setTimeout(() => setCurrentStep(prev => prev + 1), 4000);
+            }
         } else if (currentStep >= CASES[activeCase].script.length - 1) {
             setIsPlaying(false);
         }
         return () => clearTimeout(timer);
-    }, [isPlaying, currentStep, activeCase]);
+    }, [isPlaying, currentStep, activeCase, voiceEnabled, audioFinished]);
 
     // Step Change Effect (The "Engine")
     useEffect(() => {
@@ -318,6 +336,68 @@ export default function Cockpit() {
             performSearch(line.t);
         }
     };
+
+    // Stop audio playback
+    const stopAudio = () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+    };
+
+    // Toggle voice (mute/unmute)
+    const toggleVoice = () => {
+        if (voiceEnabled) {
+            stopAudio();
+        }
+        setVoiceEnabled(!voiceEnabled);
+    };
+
+    // Voice playback with caching
+    const playVoice = async (text: string, speaker: string) => {
+        if (!voiceEnabled) return;
+        setAudioFinished(false);
+        const cacheKey = `${speaker}:${text}`;
+        if (voiceCache.has(cacheKey)) {
+            const cachedUrl = voiceCache.get(cacheKey)!;
+            if (audioRef.current) {
+                audioRef.current.src = cachedUrl;
+                audioRef.current.play().catch(() => {});
+            }
+            return;
+        }
+        setIsLoadingVoice(true);
+        try {
+            const response = await fetch('/api/voice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, speaker }),
+            });
+            if (response.ok) {
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                voiceCache.set(cacheKey, audioUrl);
+                if (audioRef.current) {
+                    audioRef.current.src = audioUrl;
+                    audioRef.current.play().catch(() => {});
+                }
+            }
+        } catch (error) {
+            console.error('Voice playback error:', error);
+        } finally {
+            setIsLoadingVoice(false);
+        }
+    };
+
+    // Auto-play voice when step changes
+    useEffect(() => {
+        if (voiceEnabled && currentStep >= 0) {
+            const line = CASES[activeCase].script[currentStep];
+            if (line) {
+                playVoice(line.t, line.s);
+            }
+        }
+    }, [currentStep, voiceEnabled, activeCase]);
 
     useEffect(() => {
         transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -593,7 +673,7 @@ export default function Cockpit() {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 scroll-thin" style={{minHeight: 0}}>
+                <div className="flex-1 overflow-y-auto space-y-0.5 pr-1 pb-8 scroll-thin" style={{minHeight: 0}}>
 
                     {/* 1. Trigger & Gate */}
                     <TimelineStep
@@ -949,10 +1029,26 @@ export default function Cockpit() {
 
                     {/* LEFT: Live Transcript (4 cols) */}
                     <section data-tour="court-feed" className="col-span-4 h-full bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl flex flex-col relative overflow-hidden">
-                        <div className="shrink-0 p-4 border-b border-white/5 flex items-center gap-2">
-                            <Mic className="w-3 h-3 text-blue-400" />
-                            <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Court Feed</span>
+                        <div className="shrink-0 p-4 border-b border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Mic className="w-3 h-3 text-blue-400" />
+                                <span className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Court Feed</span>
+                            </div>
+                            <button
+                                onClick={toggleVoice}
+                                className={`p-1.5 rounded-lg transition-all ${voiceEnabled ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 'bg-amber-500/10 text-amber-400 animate-pulse border border-amber-500/30 hover:bg-amber-500/20'}`}
+                                title={voiceEnabled ? 'Click to mute' : 'Click to enable voice narration'}
+                            >
+                                {isLoadingVoice ? (
+                                    <Activity className="w-4 h-4 animate-spin" />
+                                ) : !voiceEnabled ? (
+                                    <VolumeX className="w-4 h-4" />
+                                ) : (
+                                    <Volume2 className="w-4 h-4" />
+                                )}
+                            </button>
                         </div>
+                        <audio ref={audioRef} className="hidden" onEnded={() => setAudioFinished(true)} />
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth pb-20">
                             {transcriptLines.length === 0 && (
                                 <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4">

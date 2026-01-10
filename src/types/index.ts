@@ -188,7 +188,6 @@ export interface PipelineTrace {
     filters?: string;
     dense: DenseEmbedInfo;
     sparse: SparseEmbedInfo;
-    hybrid?: {dense_k: number; sparse_k: number};
     search?: SearchConfig;
     fusion: FusionConfig;
     latency_e2e: number;
@@ -393,18 +392,13 @@ export interface ModeConfig {
 export type ModeLabels = Record<EmbeddingMode, ModeConfig>;
 
 // =============================================================================
-// Hybrid Search Types (from qdrant-hybrid-pipeline patterns)
+// Qdrant Configuration Types
 // =============================================================================
 
 /**
  * Distance metrics supported by Qdrant.
  */
 export type DistanceMetric = 'Cosine' | 'Dot' | 'Euclid';
-
-/**
- * Fusion method for combining dense and sparse results.
- */
-export type FusionMethod = 'rrf' | 'dbsf' | 'weighted';
 
 /**
  * Vector configuration for collection setup.

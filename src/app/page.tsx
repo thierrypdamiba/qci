@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import {Mic, Gavel, ShieldCheck, ChevronDown, Activity, Database, Layers, GitMerge, Laptop, Trophy, CloudLightning, RotateCcw, HelpCircle, ChevronLeft, ChevronRight, Volume2, VolumeX} from 'lucide-react';
+import {Mic, Gavel, ShieldCheck, ChevronDown, Activity, Database, GitMerge, Laptop, Trophy, CloudLightning, RotateCcw, HelpCircle, ChevronLeft, ChevronRight, Volume2, VolumeX} from 'lucide-react';
 import Link from 'next/link';
 
 // Tour step definitions
@@ -173,8 +173,6 @@ export default function Cockpit() {
     // Mode selection for comparison (local not available in production)
     const [leftMode, setLeftMode] = useState<'local' | 'jina' | 'qdrant'>('qdrant');
     const [rightMode, setRightMode] = useState<'local' | 'jina' | 'qdrant'>('jina');
-    const [hybridMode, setHybridMode] = useState(false);
-    const [showHybridModal, setShowHybridModal] = useState(false);
     const [cumulativeTimeSaved, setCumulativeTimeSaved] = useState(0);
 
     // Ensure modes are exclusive
@@ -217,7 +215,6 @@ export default function Cockpit() {
             filters: "---",
             dense: { ms: 0, model: "all-MiniLM-L6-v2", dim: 0 },
             sparse: { ms: 0, model: "---" },
-            hybrid: { dense_k: 0, sparse_k: 0 },
             fusion: { method: "---", results: 0, top_k: "---" },
             latency_e2e: 0
         },
@@ -235,7 +232,6 @@ export default function Cockpit() {
             filters: "---",
             dense: { ms: 0, model: "all-MiniLM-L6-v2", dim: 0 },
             sparse: { ms: 0, model: "---" },
-            hybrid: { dense_k: 0, sparse_k: 0 },
             fusion: { method: "---", results: 0, top_k: "---" },
             latency_e2e: 0
         },
@@ -320,7 +316,6 @@ export default function Cockpit() {
             filters: "---",
             dense: { ms: 0, model: "all-MiniLM-L6-v2", dim: 0 },
             sparse: { ms: 0, model: "---" },
-            hybrid: { dense_k: 0, sparse_k: 0 },
             fusion: { method: "---", results: 0, top_k: "---" },
             latency_e2e: 0
         };
@@ -498,8 +493,8 @@ export default function Cockpit() {
         try {
             // 2. CONCURRENT REQUESTS
             const [leftRes, rightRes] = await Promise.all([
-                fetch(`/api/cockpit?mode=${leftMode}&hybrid=${hybridMode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: query, caseId: activeCase }) }),
-                fetch(`/api/cockpit?mode=${rightMode}&hybrid=${hybridMode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: query, caseId: activeCase }) })
+                fetch(`/api/cockpit?mode=${leftMode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: query, caseId: activeCase }) }),
+                fetch(`/api/cockpit?mode=${rightMode}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: query, caseId: activeCase }) })
             ]);
 
             const qciData = await leftRes.json();
@@ -602,7 +597,7 @@ export default function Cockpit() {
     };
 
     // Lane Component
-    const Lane = ({ title, state, hits, insight, mode, opponentState, hybridMode }: any) => {
+    const Lane = ({ title, state, hits, insight, mode, opponentState }: any) => {
         const [expandedSteps, setExpandedSteps] = useState<string[]>(['embed', 'search', 'fusion', 'decision']);
         const [showAllEvidence, setShowAllEvidence] = useState(false);
 
@@ -687,27 +682,19 @@ export default function Cockpit() {
                     {!isIgnored && (
                         <TimelineStep
                             icon={modeInfo.icon}
-                            label={hybridMode ? (isQci ? "Embed Dense + Sparse (In-Cluster)" : (isJina ? "Embed Dense + Sparse (External API)" : "Embed Dense + Sparse (Client)")) : (isQci ? "Embed (In-Cluster)" : (isJina ? "Embed (External API)" : "Embed (Client)"))}
-                            value={state.timings.embed_dense > 0 ? `${state.timings.embed_dense + (state.timings.embed_sparse || 0)}ms` : "---"}
+                            label={isQci ? "Embed (In-Cluster)" : (isJina ? "Embed (External API)" : "Embed (Client)")}
+                            value={state.timings.embed_dense > 0 ? `${state.timings.embed_dense}ms` : "---"}
                             status={isQci ? "fast" : (isJina ? "ok" : "slow")}
                             expanded={expandedSteps.includes("embed")}
                             onToggle={() => toggle("embed")}
                         >
                             <div className="space-y-0.5 text-xs font-mono">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-slate-500">Dense ({state.trace.dense.model})</span>
+                                    <span className="text-slate-500">Model: {state.trace.dense.model}</span>
                                     <span className={state.timings.embed_dense > 0 ? "text-slate-300" : "text-slate-600"}>
                                         {state.timings.embed_dense > 0 ? `${state.timings.embed_dense}ms` : "---"}
                                     </span>
                                 </div>
-                                {hybridMode && (
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-slate-500">Sparse (BM25)</span>
-                                        <span className={state.timings.embed_sparse > 0 ? "text-slate-300" : "text-slate-600"}>
-                                            {state.timings.embed_sparse > 0 ? `${state.timings.embed_sparse}ms` : "---"}
-                                        </span>
-                                    </div>
-                                )}
                                 {opponentState && state.timings.embed_dense > 0 && opponentState.timings.embed_dense > 0 && (
                                     <div className={`mt-0.5 pt-0.5 border-t border-white/5 flex justify-between ${
                                         state.timings.embed_dense < opponentState.timings.embed_dense
@@ -731,7 +718,7 @@ export default function Cockpit() {
                     {!isIgnored && (
                         <TimelineStep
                             icon={Database}
-                            label={hybridMode ? "Hybrid Search (Qdrant)" : "Search (Qdrant)"}
+                            label="Search (Qdrant)"
                             value={state.timings.search > 0 ? `${state.timings.search}ms` : "---"}
                             status="default"
                             expanded={expandedSteps.includes("search")}
@@ -739,15 +726,9 @@ export default function Cockpit() {
                         >
                             <div className="space-y-1 text-xs font-mono">
                                 <div className="flex justify-between items-center p-1 bg-slate-800/30 rounded border border-white/5">
-                                    <span className="text-slate-500">Dense k</span>
+                                    <span className="text-slate-500">Top k</span>
                                     <span className="text-slate-300">{state.trace.search?.dense_k || 10}</span>
                                 </div>
-                                {hybridMode && (
-                                    <div className="flex justify-between items-center p-1 bg-slate-800/30 rounded border border-white/5">
-                                        <span className="text-slate-500">Sparse k</span>
-                                        <span className="text-slate-300">{state.trace.search?.sparse_k || 10}</span>
-                                    </div>
-                                )}
                                 <div className="flex justify-between items-center p-1 bg-slate-800/30 rounded border border-white/5">
                                     <span className="text-slate-500">Retrieved</span>
                                     <span className="text-slate-300">{state.trace.search?.retrieved || 10}</span>
@@ -760,7 +741,7 @@ export default function Cockpit() {
                     {!isIgnored && (
                         <TimelineStep
                             icon={GitMerge}
-                            label={`Results (${hybridMode ? 'RRF Fusion' : (state.trace.fusion.method || 'Semantic')})`}
+                            label={`Results (${state.trace.fusion.method || 'Semantic'})`}
                             value={state.timings.fusion > 0 ? `${state.timings.fusion}ms` : "---"}
                             status="default"
                             subValue={`Top ${state.trace.fusion.top_k}`}
@@ -924,24 +905,6 @@ export default function Cockpit() {
                             </select>
                             <ChevronDown className="w-3 h-3 absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
                         </div>
-                    </div>
-
-                    {/* Hybrid Mode Toggle */}
-                    <div className="flex items-center bg-slate-800/50 rounded-lg border border-white/10 px-3 py-1.5 gap-2">
-                        <input
-                            type="checkbox"
-                            checked={hybridMode}
-                            onChange={(e) => {
-                                if (e.target.checked) {
-                                    setShowHybridModal(true);
-                                }
-                                setHybridMode(e.target.checked);
-                            }}
-                            className="w-3 h-3 rounded border-slate-600 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer"
-                        />
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider cursor-pointer whitespace-nowrap" onClick={() => setHybridMode(!hybridMode)}>
-                            Try Hybrid Search
-                        </span>
                     </div>
 
                     {/* Mode Selectors */}
@@ -1167,12 +1130,12 @@ export default function Cockpit() {
                         <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
                             {/* Left Lane */}
                             <div data-tour="left-lane" className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${leftMode === 'qdrant' ? 'border-blue-500/20' : (leftMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
-                                <Lane title={leftMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (leftMode === 'jina' ? "EXTERNAL API" : "LOCAL CLIENT EMBEDDING")} state={qciState} hits={qciState.hits} insight={qciState.insight} mode={leftMode} opponentState={localState} hybridMode={hybridMode} />
+                                <Lane title={leftMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (leftMode === 'jina' ? "EXTERNAL API" : "LOCAL CLIENT EMBEDDING")} state={qciState} hits={qciState.hits} insight={qciState.insight} mode={leftMode} opponentState={localState} />
                             </div>
 
                             {/* Right Lane */}
                             <div data-tour="right-lane" className={`bg-slate-900/60 backdrop-blur-md border rounded-2xl p-1 overflow-hidden ${rightMode === 'qdrant' ? 'border-blue-500/20' : (rightMode === 'jina' ? 'border-purple-500/20' : 'border-white/10')}`}>
-                                <Lane title={rightMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (rightMode === 'jina' ? "EXTERNAL API" : "LOCAL CLIENT EMBEDDING")} state={localState} hits={localState.hits} insight={localState.insight} mode={rightMode} opponentState={qciState} hybridMode={hybridMode} />
+                                <Lane title={rightMode === 'qdrant' ? "QDRANT CLOUD INFERENCE" : (rightMode === 'jina' ? "EXTERNAL API" : "LOCAL CLIENT EMBEDDING")} state={localState} hits={localState.hits} insight={localState.insight} mode={rightMode} opponentState={qciState} />
                             </div>
                         </div>
 
@@ -1235,42 +1198,6 @@ export default function Cockpit() {
                     </section>
                 </div>
             </main>
-
-            {/* Hybrid Search Info Modal */}
-            {showHybridModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-slate-900 border border-purple-500/30 rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden">
-                        <div className="p-8">
-                            <div className="flex items-center gap-3 mb-6">
-                                <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                    <Layers className="w-5 h-5 text-white" />
-                                </div>
-                                <h2 className="text-2xl font-bold text-white">Hybrid Search Mode</h2>
-                            </div>
-
-                            <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-6 mb-6">
-                                <p className="text-slate-300 leading-relaxed mb-4">
-                                    <strong className="text-white">Note:</strong> BM25 sparse vectors are computed the same way across all modes for consistency.
-                                </p>
-                                <p className="text-slate-300 leading-relaxed">
-                                    Qdrant Cloud Inference supports hybrid search natively, but to keep comparisons with External API fair,
-                                    we only vary <strong className="text-purple-300">where dense embeddings are generated</strong> (QCI vs client).
-                                    Retrieval behavior remains the same across all modes.
-                                </p>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowHybridModal(false)}
-                                    className="flex-1 py-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold uppercase tracking-widest transition-all shadow-lg shadow-purple-600/20 hover:shadow-purple-600/40 hover:scale-[1.02]"
-                                >
-                                    Got it
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Welcome Modal */}
             {showModal && (

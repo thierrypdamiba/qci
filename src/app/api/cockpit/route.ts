@@ -18,7 +18,6 @@ import type {
 } from '@/types';
 import {getEmbeddingWithFallback} from '@/lib/embedding-service';
 import {searchQdrant} from '@/lib/qdrant';
-import {generateBM25Sparse} from '@/lib/localEmbeddings';
 import {getObjectionInfo, meetsObjectionThreshold} from '@/lib/objections';
 
 // =============================================================================
@@ -48,7 +47,6 @@ interface AnalysisResult {
  *
  * Query params:
  * - mode: 'local' | 'jina' | 'qdrant' (default: 'qdrant')
- * - hybrid: 'true' | 'false' (default: 'false')
  *
  * Body:
  * - text: string - The testimony to analyze
@@ -57,7 +55,6 @@ interface AnalysisResult {
 export async function POST(req: Request): Promise<NextResponse<CockpitResponse>> {
     const {searchParams} = new URL(req.url);
     const mode = (searchParams.get('mode') || 'qdrant') as EmbeddingMode;
-    const hybridMode = searchParams.get('hybrid') === 'true';
 
     const body: RequestBody = await req.json();
     const text = body.text || '';
@@ -66,7 +63,7 @@ export async function POST(req: Request): Promise<NextResponse<CockpitResponse>>
     const start = Date.now();
 
     // Initialize trace and timings
-    const trace = initializeTrace(text, caseId, hybridMode);
+    const trace = initializeTrace(text, caseId);
     const timings = initializeTimings();
 
     // --- 1. GATE / TRIGGER ---
@@ -92,13 +89,6 @@ export async function POST(req: Request): Promise<NextResponse<CockpitResponse>>
             ms: embedResult.timing_ms,
             dim: embedResult.dimension,
         };
-
-        // Sparse embedding for hybrid mode
-        if (hybridMode) {
-            const sparseResult = await generateBM25Sparse(text);
-            timings.embed_sparse = sparseResult.timing_ms;
-            trace.sparse = {model: 'bm25-qdrant', ms: sparseResult.timing_ms};
-        }
 
         // --- 4. SEARCH ---
         const filter = {
@@ -166,16 +156,16 @@ export async function POST(req: Request): Promise<NextResponse<CockpitResponse>>
 /**
  * Initializes the pipeline trace.
  */
-function initializeTrace(text: string, caseId: string, hybridMode: boolean): PipelineTrace {
+function initializeTrace(text: string, caseId: string): PipelineTrace {
     return {
         trigger: {label: 'Awaiting testimony...', action: 'PROCEED'},
         route: {plan: 'rules + case_memory', details: `case=${caseId}, phase=cross`},
         query: {text, filters: `case_id=${caseId}, phase=cross`},
         decision: 'ANALYZING...',
         dense: {model: 'all-MiniLM-L6-v2', ms: 0, dim: 384},
-        sparse: {model: hybridMode ? 'bm25' : '---', ms: 0},
+        sparse: {model: '---', ms: 0},
         search: {dense_k: 10, sparse_k: 0, retrieved: 0},
-        fusion: {method: hybridMode ? 'RRF' : 'Semantic', top_k: 5},
+        fusion: {method: 'Semantic', top_k: 5},
         latency_e2e: 0,
     };
 }

@@ -49,7 +49,6 @@ const PAYLOAD_SIZES = {
 
 interface RequestBody {
     text?: string;
-    use_hybrid?: boolean;
 }
 
 /**
@@ -63,7 +62,6 @@ interface RequestBody {
  *
  * Body:
  * - text: string - Query text (default: random sample query)
- * - use_hybrid: boolean - Whether to use hybrid mode (default: false)
  */
 export async function POST(req: Request): Promise<NextResponse<BenchmarkResponse>> {
     const {searchParams} = new URL(req.url);

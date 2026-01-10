@@ -145,14 +145,6 @@ Collection `legal_memory` with 384-dim vectors (Cosine distance) using all-MiniL
 
 Indexed fields: `case_id`, `doc_type`, `objection_type`
 
-## Hybrid Search (from qdrant-hybrid-pipeline patterns)
-
-Configuration in `src/lib/hybrid-search.ts`:
-- Dense embeddings (all-MiniLM-L6-v2) for semantic understanding
-- Sparse embeddings (BM25) for lexical precision
-- RRF fusion for combining results
-- Multi-tenancy via partition filtering on `case_id`
-
 ## Local Development with Docker
 
 ```bash

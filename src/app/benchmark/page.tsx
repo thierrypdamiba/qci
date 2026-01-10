@@ -15,7 +15,6 @@ type ComparisonMode = 'jina' | 'native';
 
 export default function Benchmark() {
     const [running, setRunning] = useState(false);
-    const [useHybrid, setUseHybrid] = useState(false);
     const [selectedQuery, setSelectedQuery] = useState(SAMPLE_QUERIES[0]);
     const [customQuery, setCustomQuery] = useState('');
     const [useCustom, setUseCustom] = useState(false);
@@ -60,14 +59,14 @@ export default function Benchmark() {
             await Promise.all([
                 runLane('local', currentQuery),
                 runLane('api', currentQuery),
-                runLane('qdrant', currentQuery, useHybrid),
+                runLane('qdrant', currentQuery),
             ]);
         }
 
         setRunning(false);
     };
 
-    const runLane = async (mode: 'local' | 'api' | 'qdrant' | 'hf' | 'native', query: string, hybrid = false) => {
+    const runLane = async (mode: 'local' | 'api' | 'qdrant' | 'hf' | 'native', query: string) => {
         // Fake visual progress - native modes are faster
         let p = 0;
         const speedMap = { native: 12, hf: 3, qdrant: 8, api: 2, local: 2 };
@@ -86,7 +85,7 @@ export default function Benchmark() {
             const res = await fetch(`/api/benchmark?mode=${mode}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: query, use_hybrid: hybrid })
+                body: JSON.stringify({ text: query })
             });
             const data = await res.json();
 
@@ -277,32 +276,8 @@ export default function Benchmark() {
                             <span className="text-xs font-mono bg-blue-900/30 border border-blue-500/50 px-2 py-1 rounded text-blue-400">OPTIMIZED</span>
                         </div>
 
-                        {/* Qdrant Feature Toggles */}
+                        {/* Qdrant Feature Badge */}
                         <div className="mb-6 space-y-2 bg-slate-900/50 p-3 rounded border border-white/5">
-
-                            {/* Hybrid Toggle */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-slate-300">Universal Query API</span>
-                                    <span className="text-[10px] text-slate-500">Dense + Sparse Fusion (RRF)</span>
-                                </div>
-                                <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                                    <input
-                                        type="checkbox"
-                                        id="hybridToggle"
-                                        checked={useHybrid}
-                                        onChange={(e) => setUseHybrid(e.target.checked)}
-                                        className="absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-700 checked:right-0 checked:border-blue-500 transition-all right-full"
-                                        style={{ right: useHybrid ? '0' : 'auto', left: useHybrid ? 'auto' : '0' }}
-                                    />
-                                    <label
-                                        htmlFor="hybridToggle"
-                                        className={`block overflow-hidden h-5 rounded-full cursor-pointer ${useHybrid ? 'bg-blue-600' : 'bg-slate-700'}`}
-                                    ></label>
-                                </div>
-                            </div>
-
-                            {/* Quantization Badge (Visual Only for Demo) */}
                             <div className="flex items-center justify-between opacity-50">
                                 <div className="flex flex-col">
                                     <span className="text-xs font-bold text-slate-300">Binary Quantization</span>
@@ -321,7 +296,7 @@ export default function Benchmark() {
                             </div>
                             <div className="mt-4 flex justify-between text-xs font-mono text-green-400">
                                 <span>Payload: <span className="text-white">0.05KB</span></span>
-                                <span>Status: <span>{useHybrid ? "HYBRID FUSION" : "DENSE SEARCH"}</span></span>
+                                <span>Status: <span>DENSE SEARCH</span></span>
                             </div>
                         </div>
                     </div>
